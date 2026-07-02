@@ -1,0 +1,27 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "extends": [
+    "ultracite/biome/core",
+    "ultracite/biome/react",
+    "ultracite/biome/vitest"
+  ],
+  // WXT auto-imports these globally (via unimport) — Biome can't see them otherwise.
+  "javascript": {
+    "globals": [
+      "defineBackground",
+      "defineContentScript",
+      "defineUnlistedScript",
+      "defineWxtPlugin",
+      "defineAppConfig",
+      "browser",
+      "storage",
+      "injectScript",
+      "ContentScriptContext",
+      "createShadowRootUi",
+      "createIntegratedUi",
+      "createIframeUi",
+      "useAppConfig",
+      "MatchPattern"
+    ]
+  }
+}

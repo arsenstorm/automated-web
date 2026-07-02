@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security report
+    url: https://github.com/arsenstorm/automated-web/security/advisories/new
+    about: Please report security vulnerabilities privately, not as a public issue.
+  - name: Questions & ideas
+    url: https://github.com/arsenstorm/automated-web/discussions
+    about: Ask questions and discuss ideas in Discussions.
