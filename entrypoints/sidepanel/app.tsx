@@ -1,19 +1,187 @@
-import { useState } from "react";
+import { Settings } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import { useCallback, useEffect, useState } from "react";
+import { sendMessage, type VaultStatus } from "@/lib/messaging";
+import { getStored, setStored } from "@/lib/storage";
+import type { RecordingState, RunState, Workflow } from "@/lib/types";
+import { EmptyState } from "./empty-state";
+import { LockScreen } from "./lock-screen";
+import { CROSSFADE } from "./motion";
+import { Onboarding } from "./onboarding";
+import { RecordButton } from "./record-button";
+import { RecordingCard } from "./recording-card";
+import { SettingsView } from "./settings";
+import { ErrorNotice, Expand, Footer, IconButton } from "./ui";
+import { WorkflowList } from "./workflow-list";
+
+const RUN_POLL_MS = 1000;
 
 function App() {
-  const [count, setCount] = useState(0);
+  const [view, setView] = useState<"main" | "settings">("main");
+  const [vaultStatus, setVaultStatus] = useState<VaultStatus | null>(null);
+  const [onboarded, setOnboarded] = useState<boolean | null>(null);
+  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [run, setRun] = useState<RunState | null>(null);
+  const [recording, setRecording] = useState<RecordingState | null>(null);
+  const [recordError, setRecordError] = useState<string | null>(null);
+  /** Freshly saved recording — its row opens with a name prompt. */
+  const [namingId, setNamingId] = useState<string | null>(null);
+
+  const refresh = useCallback(() => {
+    sendMessage("vaultStatus", undefined).then(setVaultStatus);
+    getStored("onboarded").then(setOnboarded);
+    sendMessage("listWorkflows", undefined).then(setWorkflows);
+    sendMessage("getRunState", undefined).then(setRun);
+    sendMessage("getRecording", undefined).then(setRecording);
+  }, []);
+
+  useEffect(() => {
+    refresh();
+    // Runs persist state after every step; the storage event delivers each
+    // step change instantly. The interval is a fallback safety net.
+    const timer = setInterval(refresh, RUN_POLL_MS);
+    const onStorageChanged = () => refresh();
+    browser.storage.onChanged.addListener(onStorageChanged);
+    return () => {
+      clearInterval(timer);
+      browser.storage.onChanged.removeListener(onStorageChanged);
+    };
+  }, [refresh]);
+
+  // Rows read namingId only at mount, so clear it once the fresh row exists —
+  // otherwise a remount (e.g. a settings round-trip) reopens the rename form.
+  useEffect(() => {
+    if (namingId && workflows.some((workflow) => workflow.id === namingId)) {
+      setNamingId(null);
+    }
+  }, [namingId, workflows]);
+
+  const record = async () => {
+    setRecordError(null);
+    const started = await sendMessage("startRecording", undefined);
+    if (!started) {
+      setRecordError("Open the page you want to record first.");
+    }
+    refresh();
+  };
+
+  const stopRecord = async () => {
+    // A stop with nothing recorded quietly discards, same as cancel.
+    const workflow = await sendMessage("stopRecording", undefined);
+    if (workflow) {
+      setNamingId(workflow.id);
+    }
+    refresh();
+  };
+
+  const startRecord = () => {
+    record().catch(() => null);
+  };
+  const stopAndSave = () => {
+    stopRecord().catch(() => null);
+  };
+  const cancelRecord = () => {
+    sendMessage("cancelRecording", undefined).then(refresh);
+  };
+
+  if (vaultStatus === null || onboarded === null) {
+    return null;
+  }
+
+  const mainView = (
+    <main className="flex flex-1 flex-col gap-5">
+      <header className="flex items-center justify-between gap-3">
+        <h1 className="font-semibold text-sm">Workflows</h1>
+        <div className="flex gap-1">
+          {workflows.length > 0 && (
+            <RecordButton
+              onStart={startRecord}
+              onStop={stopAndSave}
+              recording={recording !== null}
+            />
+          )}
+          <IconButton label="Settings" onClick={() => setView("settings")}>
+            <Settings aria-hidden="true" className="size-4 shrink-0" />
+          </IconButton>
+        </div>
+      </header>
+      {workflows.length === 0 ? (
+        <AnimatePresence initial={false} mode="popLayout">
+          <motion.div {...CROSSFADE} key={recording ? "recording" : "empty"}>
+            {recording ? (
+              <RecordingCard
+                onCancel={cancelRecord}
+                onStop={stopAndSave}
+                recording={recording}
+              />
+            ) : (
+              <EmptyState error={recordError} onRecord={startRecord} />
+            )}
+          </motion.div>
+        </AnimatePresence>
+      ) : (
+        // No gap here — a gap would linger while the card's height animates
+        // to zero, then snap away when it unmounts.
+        <div className="flex flex-col">
+          <Expand show={recording !== null}>
+            {recording && (
+              <RecordingCard
+                onCancel={cancelRecord}
+                onStop={stopAndSave}
+                recording={recording}
+              />
+            )}
+          </Expand>
+          <ErrorNotice message={recordError} />
+          <WorkflowList
+            namingId={namingId}
+            onChanged={refresh}
+            run={run}
+            workflows={workflows}
+          />
+        </div>
+      )}
+    </main>
+  );
+
+  let page = mainView;
+  let pageKey = view as string;
+  if (vaultStatus === "locked") {
+    page = <LockScreen onUnlocked={refresh} />;
+    pageKey = "locked";
+  } else if (!onboarded) {
+    page = (
+      <Onboarding
+        onDone={() => {
+          setView("main");
+          setStored("onboarded", true).then(refresh);
+        }}
+      />
+    );
+    pageKey = "onboarding";
+  } else if (view === "settings") {
+    page = (
+      <SettingsView
+        onBack={() => setView("main")}
+        onChanged={refresh}
+        status={vaultStatus}
+      />
+    );
+  }
 
   return (
-    <div className="flex min-w-80 flex-col items-center gap-4 p-6">
-      <h1 className="font-semibold text-2xl">WXT + React</h1>
-      <button
-        className="rounded-md bg-primary px-4 py-2 font-medium text-primary-foreground text-sm hover:opacity-90"
-        onClick={() => setCount((c) => c + 1)}
-        type="button"
-      >
-        count is {count}
-      </button>
-      <p className="text-muted-foreground text-sm">Tailwind + shadcn ready</p>
+    // The footer lives outside the crossfade so it never blurs or moves.
+    <div className="isolate flex min-h-dvh min-w-64 flex-col p-4 antialiased">
+      <AnimatePresence initial={false} mode="popLayout">
+        <motion.div
+          {...CROSSFADE}
+          className="flex flex-1 flex-col"
+          key={pageKey}
+        >
+          {page}
+        </motion.div>
+      </AnimatePresence>
+      <Footer />
     </div>
   );
 }

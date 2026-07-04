@@ -3,8 +3,7 @@
 [![Validate](https://github.com/arsenstorm/automated-web/actions/workflows/validate.yml/badge.svg)](https://github.com/arsenstorm/automated-web/actions/workflows/validate.yml)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/arsenstorm/automated-web/badge)](https://scorecard.dev/viewer/?uri=github.com/arsenstorm/automated-web)
 
-A browser extension for automating repetitive web tasks. Built with
-[WXT](https://wxt.dev) + React, a side-panel UI, and Tailwind + shadcn/ui.
+A browser extension for automating repetitive web tasks.
 
 ## Development
 

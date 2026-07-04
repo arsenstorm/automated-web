@@ -10,6 +10,7 @@ export default defineConfig({
     // (wired via setPanelBehavior in the background).
     action: {},
     permissions: [
+      "alarms",
       "storage",
       "tabs",
       "scripting",

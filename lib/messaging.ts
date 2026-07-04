@@ -1,4 +1,14 @@
 import { defineExtensionMessaging } from "@webext-core/messaging";
+import type {
+  RecordedEvent,
+  RecordingState,
+  RunState,
+  StepAction,
+  StepResult,
+  Workflow,
+} from "./types";
+
+export type VaultStatus = "open" | "locked" | "no-password";
 
 /**
  * Typed messaging between the side panel, background, and content scripts.
@@ -6,7 +16,42 @@ import { defineExtensionMessaging } from "@webext-core/messaging";
  * `sendMessage("name", data)` / `onMessage("name", handler)`.
  */
 export interface ProtocolMap {
+  cancelRecording(): void;
+  cancelRun(): void;
+  deleteWorkflow(id: string): void;
+  dismissSuggestion(data: { fingerprint: string; never: boolean }): void;
+  /** `value` is pre-decrypted by the background for input steps. */
+  executeStep(data: { step: StepAction; value?: string }): StepResult;
+  /** Ship buffered events immediately (used when a manual recording stops). */
+  flushNow(): void;
+  getRecording(): RecordingState | null;
+  getRunState(): RunState | null;
+  // side panel → background
+  listWorkflows(): Workflow[];
+  /** Drops the session key; the vault stays locked until unlocked again. */
+  lockVault(): void;
   ping(): void;
+  // content → background
+  recordEvents(events: RecordedEvent[]): void;
+  renameWorkflow(data: { id: string; name: string }): void;
+  /** Forgot-password escape hatch: wipes the vault and everything keyed to it. */
+  resetVault(): void;
+  resumeRun(): void;
+  saveSuggestion(data: { fingerprint: string }): void;
+  setVaultPassword(password: string): void;
+  /** Skip the step a paused run is stuck on and continue. */
+  skipStep(): void;
+  /** Returns false when there is no recordable active tab. */
+  startRecording(): boolean;
+  startRun(workflowId: string): void;
+  /** Saves events since startRecording as a workflow; null if too short. */
+  stopRecording(): Workflow | null;
+  /** Encrypts the raw value into the vault; returns the valueRef to record. */
+  storeValue(data: { value: string; sensitive: boolean }): string | null;
+  // background → content (tab-targeted)
+  suggestWorkflow(data: { fingerprint: string; stepCount: number }): void;
+  unlockVault(password: string): boolean;
+  vaultStatus(): VaultStatus;
 }
 
 export const { sendMessage, onMessage } =
