@@ -7,6 +7,7 @@ import {
   onClick,
   onSubmit,
   record,
+  recordNavigate,
 } from "./recorder";
 import { showToast } from "./toast";
 
@@ -16,6 +17,14 @@ export default defineContentScript({
   matches: ["<all_urls>"],
   main() {
     record({ kind: "navigate", url: location.href });
+    // Back/forward can restore from bfcache or move SPA history without
+    // re-running main(); record those navigations too.
+    window.addEventListener("pageshow", (event) => {
+      if (event.persisted) {
+        recordNavigate();
+      }
+    });
+    window.addEventListener("popstate", recordNavigate);
 
     document.addEventListener("click", onClick, true);
     document.addEventListener("change", onChange, true);

@@ -6,6 +6,7 @@ import { type ReactNode, useState } from "react";
 import { sendMessage } from "@/lib/messaging";
 import {
   GHOST_TEXT_BUTTON,
+  IconSwap,
   INPUT,
   PRIMARY_BUTTON,
   StepCard,
@@ -21,8 +22,10 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
   const go = (next: Step) => () => setStep(next);
 
   const submitPassword = async () => {
-    await sendMessage("setVaultPassword", password);
-    setPassword("");
+    if (password) {
+      await sendMessage("setVaultPassword", password);
+      setPassword("");
+    }
     setStep("done");
   };
 
@@ -103,21 +106,25 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
             name="onboarding-password"
             onChange={(event) => setPassword(event.target.value)}
             placeholder="Vault password"
-            required
             type="password"
             value={password}
           />
-          <button className={PRIMARY_BUTTON} type="submit">
-            Set password
+          <button
+            className={cn(
+              PRIMARY_BUTTON,
+              "inline-flex justify-center transition-colors",
+              !password &&
+                "bg-secondary text-secondary-foreground hover:bg-secondary/70"
+            )}
+            type="submit"
+          >
+            <IconSwap id={password ? "set" : "skip"}>
+              {password ? "Set password" : "Continue without a password"}
+            </IconSwap>
           </button>
         </form>
-        <button
-          className={cn(GHOST_TEXT_BUTTON, "mt-1")}
-          onClick={go("done")}
-          type="button"
-        >
-          Continue without a password
-        </button>
+        {/* spacer to stop layout shift from previous section */}
+        <div className="h-9" />
       </StepCard>
     ),
     done: (

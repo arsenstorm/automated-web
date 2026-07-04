@@ -26,6 +26,15 @@ export const record = (action: StepAction) => {
   buffer.push({ ts: Date.now(), origin: location.origin, action });
 };
 
+/** Record a navigation, deduping when pageshow + popstate fire together. */
+export const recordNavigate = () => {
+  const last = buffer.at(-1)?.action;
+  if (last?.kind === "navigate" && last.url === location.href) {
+    return;
+  }
+  record({ kind: "navigate", url: location.href });
+};
+
 export const flush = ({ force = false } = {}): Promise<void> => {
   if (buffer.length === 0 || (pendingValues > 0 && !force)) {
     return Promise.resolve();

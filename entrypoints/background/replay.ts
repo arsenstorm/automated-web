@@ -125,7 +125,10 @@ const runLoop = async () => {
   }
 };
 
-// ponytail: hash-insensitive exact match; add query normalization if reuse misses.
+const TRAILING_SLASH = /\/$/;
+
+// ponytail: hash- and trailing-slash-insensitive exact match; add query
+// normalization if reuse misses.
 const sameUrl = (a: string | undefined, b: string): boolean => {
   try {
     if (a === undefined) {
@@ -135,6 +138,8 @@ const sameUrl = (a: string | undefined, b: string): boolean => {
     const urlB = new URL(b);
     urlA.hash = "";
     urlB.hash = "";
+    urlA.pathname = urlA.pathname.replace(TRAILING_SLASH, "");
+    urlB.pathname = urlB.pathname.replace(TRAILING_SLASH, "");
     return urlA.href === urlB.href;
   } catch {
     return false;
