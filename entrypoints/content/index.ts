@@ -2,7 +2,6 @@ import { onMessage } from "@/lib/messaging";
 import { executeStep } from "./executor";
 import {
   flush,
-  flushNow,
   onChange,
   onClick,
   onSubmit,
@@ -30,8 +29,7 @@ export default defineContentScript({
     document.addEventListener("change", onChange, true);
     document.addEventListener("submit", onSubmit, true);
     setInterval(flush, FLUSH_INTERVAL_MS);
-    // Best-effort on unload even if a vault write is still in flight.
-    window.addEventListener("pagehide", () => flush({ force: true }));
+    window.addEventListener("pagehide", () => flush());
 
     onMessage("ping", () => {
       // Presence check used by the replayer after navigations.
@@ -39,7 +37,7 @@ export default defineContentScript({
     onMessage("suggestWorkflow", ({ data }) => {
       showToast(data.fingerprint, data.stepCount);
     });
-    onMessage("executeStep", ({ data }) => executeStep(data.step, data.value));
-    onMessage("flushNow", () => flushNow());
+    onMessage("executeStep", ({ data }) => executeStep(data.step));
+    onMessage("flushNow", () => flush());
   },
 });

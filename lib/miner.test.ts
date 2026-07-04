@@ -21,13 +21,13 @@ const loginSession = (
     {
       kind: "input",
       selector: 'input[name="user"]',
-      valueRef: "ref-u",
+      value: "ref-u",
       sensitive: false,
     },
     {
       kind: "input",
       selector: 'input[name="pass"]',
-      valueRef: password,
+      value: password,
       sensitive: true,
     },
     { kind: "submit", selector: "#login-form" },
@@ -113,7 +113,7 @@ describe("mine", () => {
     const inputStep = pattern?.steps.find(
       (step) => step.kind === "input" && step.sensitive
     );
-    expect(inputStep?.kind === "input" && inputStep.valueRef).toBe("ref-new");
+    expect(inputStep?.kind === "input" && inputStep.value).toBe("ref-new");
   });
 
   it("preserves the suggestion cooldown across mining runs", () => {
@@ -167,7 +167,7 @@ describe("toWorkflowSteps", () => {
       {
         kind: "input",
         selector: 'input[name="user"]',
-        valueRef: "r",
+        value: "r",
         sensitive: false,
       },
       { kind: "click", selector: "#login-button", text: "Login" },

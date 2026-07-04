@@ -5,10 +5,11 @@ import { dismissSuggestion, runMiner, saveSuggestion } from "./mining";
 import { startRecording, stopRecording } from "./recording";
 import { continueRun, pauseInterruptedRun, startRun } from "./replay";
 import {
+  getSecure,
   lockVault,
   resetVault,
+  setSecure,
   setVaultPassword,
-  storeValue,
   unlockVault,
   vaultLocked,
   vaultStatus,
@@ -43,24 +44,23 @@ export default defineBackground(() => {
     if (await vaultLocked()) {
       return;
     }
-    const events = await getStored("events");
+    const events = await getSecure("events");
     const tabId = sender.tab?.id;
     events.push(...data.map((event) => ({ ...event, tabId })));
-    await setStored("events", events.slice(-EVENT_BUFFER_CAP));
+    await setSecure("events", events.slice(-EVENT_BUFFER_CAP));
   });
   onMessage("startRecording", () => startRecording());
   onMessage("stopRecording", () => stopRecording());
   onMessage("cancelRecording", () => setStored("recording", null));
   onMessage("getRecording", () => getStored("recording"));
-  onMessage("storeValue", ({ data }) => storeValue(data.value));
   onMessage("saveSuggestion", ({ data }) => saveSuggestion(data.fingerprint));
   onMessage("dismissSuggestion", ({ data }) =>
     dismissSuggestion(data.fingerprint, data.never)
   );
-  onMessage("listWorkflows", () => getStored("workflows"));
+  onMessage("listWorkflows", () => getSecure("workflows"));
   onMessage("deleteWorkflow", async ({ data }) => {
-    const workflows = await getStored("workflows");
-    await setStored(
+    const workflows = await getSecure("workflows");
+    await setSecure(
       "workflows",
       workflows.filter((workflow) => workflow.id !== data)
     );
@@ -70,8 +70,8 @@ export default defineBackground(() => {
     }
   });
   onMessage("renameWorkflow", async ({ data }) => {
-    const workflows = await getStored("workflows");
-    await setStored(
+    const workflows = await getSecure("workflows");
+    await setSecure(
       "workflows",
       workflows.map((workflow) =>
         workflow.id === data.id ? { ...workflow, name: data.name } : workflow

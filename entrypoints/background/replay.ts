@@ -5,7 +5,7 @@ import { notify, notifyStuck } from "@/lib/notify";
 import { afterStep, pausedRun, resumedRun, startedRun } from "@/lib/replay";
 import { getStored, setStored } from "@/lib/storage";
 import type { RunState, StepResult, Workflow } from "@/lib/types";
-import { decryptRef, vaultLocked } from "./vault";
+import { getSecure, vaultLocked } from "./vault";
 
 const TAB_LOAD_TIMEOUT_MS = 30_000;
 const PING_RETRY_MS = 200;
@@ -75,21 +75,12 @@ const executeOneStep = async (
   if (step.kind === "navigate") {
     return await navigateStep(run.tabId, step.url);
   }
-  let value: string | undefined;
-  if (step.kind === "input") {
-    // Only a genuinely locked vault reports "vault locked" — with no
-    // password the vault always decrypts, so a null here means the value
-    // itself is gone (recorded while locked, or storage cleared).
-    if (await vaultLocked()) {
-      return "vault-locked";
-    }
-    const decrypted = await decryptRef(step.valueRef);
-    if (decrypted === null) {
-      return { ok: false, reason: "missing value", detail: step.selector };
-    }
-    value = decrypted;
+  // Values are inline in the step, but honour a mid-run lock: locked means
+  // dormant, so don't keep typing secrets into pages.
+  if (step.kind === "input" && (await vaultLocked())) {
+    return "vault-locked";
   }
-  return await sendMessage("executeStep", { step, value }, run.tabId).catch(
+  return await sendMessage("executeStep", { step }, run.tabId).catch(
     (): StepResult => ({
       ok: false,
       reason: "timeout",
@@ -100,10 +91,10 @@ const executeOneStep = async (
 
 const runLoop = async () => {
   let run = await getStored("run");
-  if (!run || run.status !== "running") {
+  if (run?.status !== "running") {
     return;
   }
-  const workflows = await getStored("workflows");
+  const workflows = await getSecure("workflows");
   const workflow = workflows.find((w) => w.id === run?.workflowId);
   if (!workflow) {
     await setStored("run", null);
@@ -150,7 +141,7 @@ export const startRun = async (workflowId: string) => {
   if (await vaultLocked()) {
     return;
   }
-  const workflows = await getStored("workflows");
+  const workflows = await getSecure("workflows");
   const workflow = workflows.find((w) => w.id === workflowId);
   const first = workflow?.steps[0];
   if (!(workflow && first) || first.kind !== "navigate") {
@@ -184,7 +175,7 @@ export const startRun = async (workflowId: string) => {
 /** Continue a paused run, optionally skipping the step it is stuck on. */
 export const continueRun = async ({ skip }: { skip: boolean }) => {
   const run = await getStored("run");
-  if (!run || run.status !== "paused") {
+  if (run?.status !== "paused") {
     return;
   }
   const tabAlive = await browser.tabs
@@ -195,7 +186,7 @@ export const continueRun = async ({ skip }: { skip: boolean }) => {
     await setStored("run", pausedRun(run, "tab was closed"));
     return;
   }
-  const workflows = await getStored("workflows");
+  const workflows = await getSecure("workflows");
   const workflow = workflows.find((w) => w.id === run.workflowId);
   if (!workflow) {
     await setStored("run", null);

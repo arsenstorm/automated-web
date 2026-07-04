@@ -133,7 +133,7 @@ export function mine(
       fingerprint,
       origin: sequence[0]?.origin ?? "",
       count: (previous?.count ?? 0) + 1,
-      // Freshest steps win so replay uses the newest valueRefs.
+      // Freshest steps win so replay uses the newest input values.
       steps: sequence.map((event) => event.action),
       lastSeen: sequence.at(-1)?.ts ?? 0,
       lastSuggestedAt: previous?.lastSuggestedAt,

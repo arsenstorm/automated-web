@@ -1,8 +1,8 @@
-/** Vault key management and value encryption, bound to extension storage. */
+/** Vault key management and encrypted-at-rest storage for recorded data. */
 
 import type { VaultStatus } from "@/lib/messaging";
 import { getStored, setStored } from "@/lib/storage";
-import type { VaultEntry } from "@/lib/types";
+import type { CandidatePattern, RecordedEvent, Workflow } from "@/lib/types";
 import {
   decryptValue,
   deriveKey,
@@ -14,9 +14,22 @@ import {
 } from "@/lib/vault";
 
 const SESSION_KEY = "vaultKeyJwk";
-/** Sentinel entry used to verify a vault password. */
-const CHECK_REF = "__check";
+/** Plaintext behind `vaultMeta.check`, used to verify a vault password. */
 const CHECK_VALUE = "ok";
+
+/** Everything the user records is encrypted at rest under these keys. */
+interface SecureShape {
+  events: RecordedEvent[];
+  patterns: Record<string, CandidatePattern>;
+  workflows: Workflow[];
+}
+
+const SECURE_KEYS = ["events", "patterns", "workflows"] as const;
+const SECURE_DEFAULTS: SecureShape = {
+  events: [],
+  patterns: {},
+  workflows: [],
+};
 
 const sessionKeyJwk = async (): Promise<JsonWebKey | null> => {
   const stored = await browser.storage.session.get(SESSION_KEY);
@@ -38,32 +51,31 @@ const getVaultKey = async (): Promise<CryptoKey | null> => {
   return key;
 };
 
-export const storeValue = async (value: string): Promise<string | null> => {
-  const key = await getVaultKey();
-  if (!key) {
-    return null;
-  }
-  const vault = await getStored("vault");
-  const ref = crypto.randomUUID();
-  vault[ref] = await encryptValue(key, value);
-  await setStored("vault", vault);
-  return ref;
-};
-
-export const decryptRef = async (ref: string): Promise<string | null> => {
-  if (!ref) {
-    return null;
-  }
-  const [key, vault] = await Promise.all([getVaultKey(), getStored("vault")]);
-  const entry = vault[ref];
-  if (!(key && entry)) {
-    return null;
+/** Decrypted read; defaults when the key is absent (locked) or unreadable. */
+export const getSecure = async <K extends keyof SecureShape>(
+  key: K
+): Promise<SecureShape[K]> => {
+  const [vaultKey, entry] = await Promise.all([getVaultKey(), getStored(key)]);
+  if (!(vaultKey && entry)) {
+    return structuredClone(SECURE_DEFAULTS[key]);
   }
   try {
-    return await decryptValue(key, entry);
+    return JSON.parse(await decryptValue(vaultKey, entry)) as SecureShape[K];
   } catch {
-    return null;
+    return structuredClone(SECURE_DEFAULTS[key]);
   }
+};
+
+/** Encrypted write; throws while locked rather than storing plaintext. */
+export const setSecure = async <K extends keyof SecureShape>(
+  key: K,
+  value: SecureShape[K]
+): Promise<void> => {
+  const vaultKey = await getVaultKey();
+  if (!vaultKey) {
+    throw new Error("Vault is locked");
+  }
+  await setStored(key, await encryptValue(vaultKey, JSON.stringify(value)));
 };
 
 export const vaultStatus = async (): Promise<VaultStatus> => {
@@ -105,14 +117,12 @@ export const resetVault = async (): Promise<void> => {
 
 export const unlockVault = async (password: string): Promise<boolean> => {
   const meta = await getStored("vaultMeta");
-  if (!meta.salt) {
+  if (!(meta.salt && meta.check)) {
     return false;
   }
   const key = await deriveKey(password, meta.salt);
-  const vault = await getStored("vault");
-  const check = vault[CHECK_REF];
   try {
-    if (!check || (await decryptValue(key, check)) !== CHECK_VALUE) {
+    if ((await decryptValue(key, meta.check)) !== CHECK_VALUE) {
       return false;
     }
   } catch {
@@ -122,18 +132,6 @@ export const unlockVault = async (password: string): Promise<boolean> => {
   return true;
 };
 
-const reencryptVault = async (
-  oldKey: CryptoKey,
-  newKey: CryptoKey,
-  vault: Record<string, VaultEntry>
-): Promise<Record<string, VaultEntry>> => {
-  const next: Record<string, VaultEntry> = {};
-  for (const [ref, entry] of Object.entries(vault)) {
-    next[ref] = await encryptValue(newKey, await decryptValue(oldKey, entry));
-  }
-  return next;
-};
-
 export const setVaultPassword = async (password: string): Promise<void> => {
   const oldKey = await getVaultKey();
   if (!oldKey) {
@@ -141,11 +139,16 @@ export const setVaultPassword = async (password: string): Promise<void> => {
   }
   const salt = randomSalt();
   const newKey = await deriveKey(password, salt);
-  const vault = await reencryptVault(oldKey, newKey, await getStored("vault"));
-  vault[CHECK_REF] = await encryptValue(newKey, CHECK_VALUE);
-  await setStored("vault", vault);
-  await setStored("vaultMeta", { salt });
-  await browser.storage.session.set({
-    [SESSION_KEY]: await exportKey(newKey),
-  });
+  const write: Record<string, unknown> = {
+    vaultMeta: { salt, check: await encryptValue(newKey, CHECK_VALUE) },
+  };
+  for (const key of SECURE_KEYS) {
+    write[key] = await encryptValue(
+      newKey,
+      JSON.stringify(await getSecure(key))
+    );
+  }
+  // Single write: a crash can't leave data encrypted under an unsaved key.
+  await browser.storage.local.set(write);
+  await browser.storage.session.set({ [SESSION_KEY]: await exportKey(newKey) });
 };

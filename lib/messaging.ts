@@ -20,8 +20,7 @@ export interface ProtocolMap {
   cancelRun(): void;
   deleteWorkflow(id: string): void;
   dismissSuggestion(data: { fingerprint: string; never: boolean }): void;
-  /** `value` is pre-decrypted by the background for input steps. */
-  executeStep(data: { step: StepAction; value?: string }): StepResult;
+  executeStep(data: { step: StepAction }): StepResult;
   /** Ship buffered events immediately (used when a manual recording stops). */
   flushNow(): void;
   getRecording(): RecordingState | null;
@@ -46,8 +45,6 @@ export interface ProtocolMap {
   startRun(workflowId: string): void;
   /** Saves events since startRecording as a workflow; null if too short. */
   stopRecording(): Workflow | null;
-  /** Encrypts the raw value into the vault; returns the valueRef to record. */
-  storeValue(data: { value: string; sensitive: boolean }): string | null;
   // background → content (tab-targeted)
   suggestWorkflow(data: { fingerprint: string; stepCount: number }): void;
   unlockVault(password: string): boolean;

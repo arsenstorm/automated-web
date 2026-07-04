@@ -7,13 +7,9 @@ import { isInToast } from "./toast";
 
 const ACTIONABLE = 'button, a, [role="button"], input[type="submit"], label';
 const SENSITIVE_AUTOCOMPLETE = /password|cc-/;
-const PENDING_WAIT_MS = 100;
-const PENDING_WAIT_ROUNDS = 10;
 
 const buffer: RecordedEvent[] = [];
 let suppressUntil = 0;
-/** In-flight storeValue calls; flushing waits so valueRefs are patched in. */
-let pendingValues = 0;
 
 /** Pause recording briefly, e.g. around replayed steps. */
 export const suppressRecording = (ms: number) => {
@@ -35,27 +31,13 @@ export const recordNavigate = () => {
   record({ kind: "navigate", url: location.href });
 };
 
-export const flush = ({ force = false } = {}): Promise<void> => {
-  if (buffer.length === 0 || (pendingValues > 0 && !force)) {
+export const flush = (): Promise<void> => {
+  if (buffer.length === 0) {
     return Promise.resolve();
   }
   return sendMessage("recordEvents", buffer.splice(0)).catch(() => {
     // Extension context gone (reload); nothing to do.
   });
-};
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-/** Wait briefly for in-flight vault writes, then ship whatever we have. */
-export const flushNow = async (): Promise<void> => {
-  for (
-    let round = 0;
-    round < PENDING_WAIT_ROUNDS && pendingValues > 0;
-    round++
-  ) {
-    await sleep(PENDING_WAIT_MS);
-  }
-  await flush({ force: true });
 };
 
 export const onClick = (event: MouseEvent) => {
@@ -99,25 +81,8 @@ export const onChange = (event: Event) => {
   if (existing >= 0) {
     buffer.splice(existing, 1);
   }
-  // Record synchronously to preserve event order; patch the ref when the
-  // vault write resolves. Empty ref = value unavailable (vault locked);
-  // replay pauses on it.
-  const action: Extract<StepAction, { kind: "input" }> = {
-    kind: "input",
-    selector,
-    valueRef: "",
-    sensitive,
-  };
-  record(action);
-  pendingValues++;
-  sendMessage("storeValue", { value: el.value, sensitive })
-    .then((ref) => {
-      action.valueRef = ref ?? "";
-    })
-    .catch(() => null)
-    .finally(() => {
-      pendingValues--;
-    });
+  // Plaintext in the buffer only; the background encrypts at rest.
+  record({ kind: "input", selector, value: el.value, sensitive });
 };
 
 export const onSubmit = (event: Event) => {

@@ -103,6 +103,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
           <input
             className={cn(INPUT, "text-center")}
             id="onboarding-password"
+            minLength={8}
             name="onboarding-password"
             onChange={(event) => setPassword(event.target.value)}
             placeholder="Vault password"

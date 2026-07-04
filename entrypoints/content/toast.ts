@@ -22,7 +22,7 @@ const TOAST_CSS = `
     width: 320px;
     max-width: calc(100vw - 32px);
     padding: 16px;
-    border-radius: 12px;
+    border-radius: 10px;
     background: oklch(1 0 0);
     color: oklch(0.141 0.005 285.823);
     font: 400 14px/1.45 system-ui, sans-serif;
@@ -38,13 +38,13 @@ const TOAST_CSS = `
   button {
     all: initial;
     cursor: pointer;
-    padding: 5px 10px;
-    border-radius: 6px;
+    padding: 4px 10px;
+    border-radius: 8px;
     font: 500 14px/1.45 system-ui, sans-serif;
     color: oklch(0.21 0.006 285.885);
     background: oklch(0.967 0.001 286.375);
   }
-  button:hover { background: oklch(0.93 0.001 286.375); }
+  button:hover { background: oklch(0.967 0.001 286.375 / 0.7); }
   button:focus-visible {
     outline: 2px solid oklch(0.705 0.015 286.067);
     outline-offset: 2px;
@@ -53,7 +53,7 @@ const TOAST_CSS = `
     color: oklch(0.421 0.095 57.708);
     background: oklch(0.852 0.199 91.936);
   }
-  button.primary:hover { background: oklch(0.81 0.19 91.936); }
+  button.primary:hover { background: oklch(0.852 0.199 91.936 / 0.9); }
   @media (prefers-color-scheme: dark) {
     .toast {
       background: oklch(0.21 0.006 285.885);
@@ -65,12 +65,12 @@ const TOAST_CSS = `
       color: oklch(0.985 0 0);
       background: oklch(0.274 0.006 286.033);
     }
-    button:hover { background: oklch(0.32 0.006 286.033); }
+    button:hover { background: oklch(0.274 0.006 286.033 / 0.7); }
     button.primary {
       color: oklch(0.421 0.095 57.708);
       background: oklch(0.795 0.184 86.047);
     }
-    button.primary:hover { background: oklch(0.75 0.18 86.047); }
+    button.primary:hover { background: oklch(0.795 0.184 86.047 / 0.9); }
   }
 `;
 

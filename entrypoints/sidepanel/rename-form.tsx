@@ -49,7 +49,7 @@ export function RenameForm({
         className="w-full rounded-md bg-transparent px-2 py-1 font-medium text-sm ring-1 ring-input placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-1"
         id={`rename-${workflow.id}`}
         name={`rename-${workflow.id}`}
-        onBlur={onDone}
+        onBlur={submit}
         onChange={(event) => setName(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Escape") {

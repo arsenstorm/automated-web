@@ -54,7 +54,7 @@ function VaultSettings({
           description={
             hasPassword
               ? "Used to unlock the vault where your recordings are securely stored."
-              : "Recorded inputs are encrypted, but anyone using this browser profile can decrypt them."
+              : "Recordings are encrypted, but anyone using this browser profile can decrypt them."
           }
           label="Vault password"
         >
@@ -76,6 +76,7 @@ function VaultSettings({
             <input
               className={cn(INPUT, "min-w-0 flex-1 py-1")}
               id="vault-password"
+              minLength={8}
               name="vault-password"
               onChange={(event) => setPassword(event.target.value)}
               placeholder={

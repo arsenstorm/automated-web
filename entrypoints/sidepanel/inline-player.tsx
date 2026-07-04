@@ -25,8 +25,12 @@ export function InlinePlayer({
   total: number;
   onChanged: () => void;
 }) {
-  const completed = run.status === "done" ? total : run.stepIndex;
-  const percent = total === 0 ? 0 : (completed / total) * FULL_WIDTH;
+  // Step 0 is the initial navigate — the page the run starts on, not work.
+  // Number and measure progress against the real steps only.
+  const steps = Math.max(total - 1, 1);
+  const completed =
+    run.status === "done" ? steps : Math.max(run.stepIndex - 1, 0);
+  const percent = (completed / steps) * FULL_WIDTH;
 
   return (
     <div className="pt-2">
@@ -47,7 +51,7 @@ export function InlinePlayer({
         <div className="flex min-w-0 items-center gap-2">
           <Badge tone={RUN_TONES[run.status]}>{run.status}</Badge>
           <p className="min-w-0 truncate text-muted-foreground text-sm tabular-nums">
-            Step {Math.min(run.stepIndex + 1, total)} of {total}
+            Step {Math.min(Math.max(run.stepIndex, 1), steps)} of {steps}
             {run.pausedReason ? ` — ${run.pausedReason}` : ""}
           </p>
         </div>

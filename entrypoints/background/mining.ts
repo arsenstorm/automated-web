@@ -10,7 +10,7 @@ import {
 import { suggestName } from "@/lib/naming";
 import { getStored, setStored } from "@/lib/storage";
 import type { Workflow } from "@/lib/types";
-import { vaultLocked } from "./vault";
+import { getSecure, setSecure, vaultLocked } from "./vault";
 
 const suggestToActiveTab = async (
   origin: string,
@@ -39,10 +39,10 @@ export const runMiner = async () => {
   }
   const [events, patterns, suppressed, workflows, settings] = await Promise.all(
     [
-      getStored("events"),
-      getStored("patterns"),
+      getSecure("events"),
+      getSecure("patterns"),
       getStored("suppressed"),
-      getStored("workflows"),
+      getSecure("workflows"),
       getStored("settings"),
     ]
   );
@@ -50,7 +50,7 @@ export const runMiner = async () => {
   let next = patterns;
   if (closed.length > 0) {
     next = mine(closed, patterns);
-    await Promise.all([setStored("patterns", next), setStored("events", open)]);
+    await Promise.all([setSecure("patterns", next), setSecure("events", open)]);
   }
   // Pending suggestions retry every tick until the user is on that origin.
   const due = pendingSuggestions({
@@ -61,28 +61,30 @@ export const runMiner = async () => {
     now: Date.now(),
   });
   for (const pattern of due) {
+    // Count what the saved workflow will show: real steps, no leading navigate.
+    const steps = toWorkflowSteps(pattern.steps);
     const shown = await suggestToActiveTab(
       pattern.origin,
       pattern.fingerprint,
-      pattern.steps.length
+      steps[0]?.kind === "navigate" ? steps.length - 1 : steps.length
     );
     if (shown) {
       next[pattern.fingerprint] = {
         ...pattern,
         lastSuggestedAt: Date.now(),
       };
-      await setStored("patterns", next);
+      await setSecure("patterns", next);
     }
   }
 };
 
 export const saveSuggestion = async (fingerprint: string) => {
-  const patterns = await getStored("patterns");
+  const patterns = await getSecure("patterns");
   const pattern = patterns[fingerprint];
   if (!pattern) {
     return;
   }
-  const workflows = await getStored("workflows");
+  const workflows = await getSecure("workflows");
   const host = new URL(pattern.origin).host;
   const steps = toWorkflowSteps(pattern.steps);
   const workflow: Workflow = {
@@ -101,8 +103,8 @@ export const saveSuggestion = async (fingerprint: string) => {
   const suppressed = await getStored("suppressed");
   suppressed.push(fingerprint);
   await Promise.all([
-    setStored("workflows", workflows),
-    setStored("patterns", patterns),
+    setSecure("workflows", workflows),
+    setSecure("patterns", patterns),
     setStored("suppressed", suppressed),
   ]);
 };
@@ -112,14 +114,14 @@ export const dismissSuggestion = async (
   never: boolean
 ) => {
   const [patterns, suppressed] = await Promise.all([
-    getStored("patterns"),
+    getSecure("patterns"),
     getStored("suppressed"),
   ]);
   const origin = patterns[fingerprint]?.origin;
   suppressed.push(never && origin ? `never:${origin}` : fingerprint);
   delete patterns[fingerprint];
   await Promise.all([
-    setStored("patterns", patterns),
+    setSecure("patterns", patterns),
     setStored("suppressed", suppressed),
   ]);
 };

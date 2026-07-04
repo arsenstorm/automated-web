@@ -43,13 +43,13 @@ const setNativeValue = (el: Element, value: string) => {
   el.dispatchEvent(new Event("change", { bubbles: true }));
 };
 
-const applyStep = (el: Element, step: StepAction, value?: string) => {
+const applyStep = (el: Element, step: StepAction) => {
   el.scrollIntoView({ block: "center" });
   if (step.kind === "input") {
     if (el instanceof HTMLElement) {
       el.focus();
     }
-    setNativeValue(el, value ?? "");
+    setNativeValue(el, step.value);
     return;
   }
   if (step.kind === "submit" && el instanceof HTMLFormElement) {
@@ -61,10 +61,7 @@ const applyStep = (el: Element, step: StepAction, value?: string) => {
   }
 };
 
-export const executeStep = async (
-  step: StepAction,
-  value?: string
-): Promise<StepResult> => {
+export const executeStep = async (step: StepAction): Promise<StepResult> => {
   if (step.kind === "navigate") {
     return { ok: true };
   }
@@ -86,6 +83,6 @@ export const executeStep = async (
     return { ok: false, reason: "timeout", detail: step.selector };
   }
   suppressRecording(REPLAY_SUPPRESS_MS);
-  applyStep(el, step, value);
+  applyStep(el, step);
   return { ok: true };
 };

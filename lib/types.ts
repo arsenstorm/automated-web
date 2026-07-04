@@ -3,7 +3,7 @@
 export type StepAction =
   | { kind: "navigate"; url: string }
   | { kind: "click"; selector: string; text?: string }
-  | { kind: "input"; selector: string; valueRef: string; sensitive: boolean }
+  | { kind: "input"; selector: string; value: string; sensitive: boolean }
   | { kind: "submit"; selector: string };
 
 export interface RecordedEvent {
@@ -47,7 +47,7 @@ export type StepResult =
   | { ok: true }
   | {
       ok: false;
-      reason: "timeout" | "captcha" | "missing value";
+      reason: "timeout" | "captcha";
       detail?: string;
     };
 
@@ -58,6 +58,8 @@ export interface VaultEntry {
 }
 
 export interface VaultMeta {
+  /** Encrypted check value used to verify a password on unlock. */
+  check?: VaultEntry;
   /** Random key (JWK) used when no password is set. */
   rawKeyJwk?: JsonWebKey;
   /** PBKDF2 salt (base64) — present iff a vault password is set. */
@@ -72,7 +74,7 @@ export interface CandidatePattern {
   /** Last time a toast was shown for this pattern (suggestion cooldown). */
   lastSuggestedAt?: number;
   origin: string;
-  /** Steps from the most recent matching session (freshest valueRefs). */
+  /** Steps from the most recent matching session (freshest input values). */
   steps: StepAction[];
 }
 
@@ -84,12 +86,17 @@ export const DEFAULT_SETTINGS: Settings = { minRepeats: 3 };
 
 export const EVENT_BUFFER_CAP = 1000;
 
-/** storage.local keys and their value shapes. */
+/**
+ * storage.local keys and their value shapes. `events`, `patterns`, and
+ * `workflows` are encrypted at rest — read them through the background's
+ * getSecure/setSecure, which decrypt to `RecordedEvent[]`,
+ * `Record<string, CandidatePattern>`, and `Workflow[]` respectively.
+ */
 export interface StorageShape {
-  events: RecordedEvent[];
+  events: VaultEntry | null;
   /** First-run onboarding finished. Cleared by a vault reset so it re-runs. */
   onboarded: boolean;
-  patterns: Record<string, CandidatePattern>;
+  patterns: VaultEntry | null;
   /** Active manual recording. */
   recording: RecordingState | null;
   /** Single active run. ponytail: one run at a time; make it a map if concurrent runs are ever wanted. */
@@ -97,7 +104,6 @@ export interface StorageShape {
   settings: Settings;
   /** Dismissed fingerprints and `never:<origin>` entries. */
   suppressed: string[];
-  vault: Record<string, VaultEntry>;
   vaultMeta: VaultMeta;
-  workflows: Workflow[];
+  workflows: VaultEntry | null;
 }
