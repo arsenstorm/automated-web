@@ -1,4 +1,5 @@
 import { onMessage } from "@/lib/messaging";
+import { getStored } from "@/lib/storage";
 import { executeStep } from "./executor";
 import {
   flush,
@@ -7,6 +8,7 @@ import {
   onSubmit,
   record,
   recordNavigate,
+  setRecordSecrets,
 } from "./recorder";
 import { showToast } from "./toast";
 
@@ -15,6 +17,18 @@ const FLUSH_INTERVAL_MS = 5000;
 export default defineContentScript({
   matches: ["<all_urls>"],
   main() {
+    const syncRecordSecrets = () => {
+      getStored("settings")
+        .then((settings) => setRecordSecrets(Boolean(settings.recordSecrets)))
+        .catch(() => null);
+    };
+    syncRecordSecrets();
+    browser.storage.onChanged.addListener((changes) => {
+      if (changes.settings) {
+        syncRecordSecrets();
+      }
+    });
+
     record({ kind: "navigate", url: location.href });
     // Back/forward can restore from bfcache or move SPA history without
     // re-running main(); record those navigations too.

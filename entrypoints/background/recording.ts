@@ -2,9 +2,9 @@
 
 import { sendMessage } from "@/lib/messaging";
 import { fingerprintSession, toWorkflowSteps } from "@/lib/miner";
-import { suggestName } from "@/lib/naming";
 import { getStored, setStored } from "@/lib/storage";
 import type { Workflow } from "@/lib/types";
+import { buildWorkflow } from "@/lib/workflow";
 import { getSecure, setSecure } from "./vault";
 
 export const startRecording = async (): Promise<boolean> => {
@@ -40,21 +40,12 @@ export const stopRecording = async (): Promise<Workflow | null> => {
     return null;
   }
   const workflows = await getSecure("workflows");
-  const workflow: Workflow = {
-    id: crypto.randomUUID(),
-    origin: new URL(recording.startUrl).origin,
-    name: suggestName(
-      events.map((event) => event.action),
-      new URL(recording.startUrl).host
-    ),
-    createdAt: Date.now(),
+  const workflow = buildWorkflow({
+    actions: events.map((event) => event.action),
+    startUrl: recording.startUrl,
     // Suppresses future toasts if the miner spots the same flow.
     fingerprint: fingerprintSession(events),
-    steps:
-      steps[0]?.kind === "navigate"
-        ? steps
-        : [{ kind: "navigate", url: recording.startUrl }, ...steps],
-  };
+  });
   workflows.push(workflow);
   await setSecure("workflows", workflows);
   return workflow;

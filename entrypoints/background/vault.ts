@@ -11,7 +11,7 @@ import {
   generateRandomKey,
   importKey,
   randomSalt,
-} from "@/lib/vault";
+} from "@/lib/vault-crypto";
 
 const SESSION_KEY = "vaultKeyJwk";
 /** Plaintext behind `vaultMeta.check`, used to verify a vault password. */

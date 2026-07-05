@@ -2,7 +2,12 @@
 
 import { sendMessage } from "@/lib/messaging";
 import { notify, notifyStuck } from "@/lib/notify";
-import { afterStep, pausedRun, resumedRun, startedRun } from "@/lib/replay";
+import {
+  afterStep,
+  pausedRun,
+  resumedRun,
+  startedRun,
+} from "@/lib/replay-state";
 import { getStored, setStored } from "@/lib/storage";
 import type { RunState, StepResult, Workflow } from "@/lib/types";
 import { getSecure, vaultLocked } from "./vault";

@@ -7,9 +7,8 @@ import {
   sessionize,
   toWorkflowSteps,
 } from "@/lib/miner";
-import { suggestName } from "@/lib/naming";
 import { getStored, setStored } from "@/lib/storage";
-import type { Workflow } from "@/lib/types";
+import { buildWorkflow } from "@/lib/workflow";
 import { getSecure, setSecure, vaultLocked } from "./vault";
 
 const suggestToActiveTab = async (
@@ -85,19 +84,11 @@ export const saveSuggestion = async (fingerprint: string) => {
     return;
   }
   const workflows = await getSecure("workflows");
-  const host = new URL(pattern.origin).host;
-  const steps = toWorkflowSteps(pattern.steps);
-  const workflow: Workflow = {
-    id: crypto.randomUUID(),
-    origin: pattern.origin,
-    name: suggestName(pattern.steps, host),
-    createdAt: Date.now(),
+  const workflow = buildWorkflow({
+    actions: pattern.steps,
+    startUrl: pattern.origin,
     fingerprint,
-    steps:
-      steps[0]?.kind === "navigate"
-        ? steps
-        : [{ kind: "navigate", url: pattern.origin }, ...steps],
-  };
+  });
   workflows.push(workflow);
   delete patterns[fingerprint];
   const suppressed = await getStored("suppressed");

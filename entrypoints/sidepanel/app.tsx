@@ -1,7 +1,12 @@
 import { Settings } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useState } from "react";
-import { sendMessage, type VaultStatus } from "@/lib/messaging";
+import { IconButton } from "@/components/buttons";
+import { ErrorNotice } from "@/components/error-notice";
+import { Footer } from "@/components/footer";
+import { Expand } from "@/components/transitions";
+import { ViewTitle } from "@/components/view-title";
+import { fireAndForget, sendMessage, type VaultStatus } from "@/lib/messaging";
 import { getStored, setStored } from "@/lib/storage";
 import type { RecordingState, RunState, Workflow } from "@/lib/types";
 import { EmptyState } from "./empty-state";
@@ -11,7 +16,6 @@ import { Onboarding } from "./onboarding";
 import { RecordButton } from "./record-button";
 import { RecordingCard } from "./recording-card";
 import { SettingsView } from "./settings";
-import { ErrorNotice, Expand, Footer, IconButton, ViewTitle } from "./ui";
 import { WorkflowList } from "./workflow-list";
 
 const RUN_POLL_MS = 1000;
@@ -29,11 +33,11 @@ function App() {
   const pageFade = usePageCrossfade();
 
   const refresh = useCallback(() => {
-    sendMessage("vaultStatus").then(setVaultStatus);
-    getStored("onboarded").then(setOnboarded);
-    sendMessage("listWorkflows").then(setWorkflows);
-    sendMessage("getRunState").then(setRun);
-    sendMessage("getRecording").then(setRecording);
+    fireAndForget(sendMessage("vaultStatus").then(setVaultStatus));
+    fireAndForget(getStored("onboarded").then(setOnboarded));
+    fireAndForget(sendMessage("listWorkflows").then(setWorkflows));
+    fireAndForget(sendMessage("getRunState").then(setRun));
+    fireAndForget(sendMessage("getRecording").then(setRecording));
   }, []);
 
   useEffect(() => {
@@ -82,7 +86,7 @@ function App() {
     stopRecord().catch(() => null);
   };
   const cancelRecord = () => {
-    sendMessage("cancelRecording").then(refresh);
+    fireAndForget(sendMessage("cancelRecording"), refresh);
   };
 
   if (vaultStatus === null || onboarded === null) {
@@ -155,7 +159,7 @@ function App() {
       <Onboarding
         onDone={() => {
           setView("main");
-          setStored("onboarded", true).then(refresh);
+          fireAndForget(setStored("onboarded", true), refresh);
         }}
       />
     );

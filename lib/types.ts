@@ -47,7 +47,7 @@ export type StepResult =
   | { ok: true }
   | {
       ok: false;
-      reason: "timeout" | "captcha";
+      reason: "timeout" | "captcha" | "secret";
       detail?: string;
     };
 
@@ -80,9 +80,14 @@ export interface CandidatePattern {
 
 export interface Settings {
   minRepeats: number;
+  /** Store secret-field values (encrypted) so replay can fill them. */
+  recordSecrets: boolean;
 }
 
-export const DEFAULT_SETTINGS: Settings = { minRepeats: 3 };
+export const DEFAULT_SETTINGS: Settings = {
+  minRepeats: 3,
+  recordSecrets: false,
+};
 
 export const EVENT_BUFFER_CAP = 1000;
 

@@ -4,10 +4,11 @@ import { cn } from "cnfast";
 import { EllipsisVertical } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { type RefObject, useEffect, useRef, useState } from "react";
-import { sendMessage } from "@/lib/messaging";
+import { IconButton } from "@/components/buttons";
+import { FOCUS_RING_INSET } from "@/components/styles";
+import { fireAndForget, sendMessage } from "@/lib/messaging";
 import type { Workflow } from "@/lib/types";
 import { useAnimDuration } from "./motion";
-import { FOCUS_RING_INSET, IconButton } from "./ui";
 
 const MENU_ITEM = `block w-full rounded-sm px-2 py-1 text-left text-sm hover:bg-secondary ${FOCUS_RING_INSET}`;
 
@@ -94,7 +95,10 @@ export function RowMenu({
                   return;
                 }
                 setOpen(false);
-                sendMessage("deleteWorkflow", workflow.id).then(onChanged);
+                fireAndForget(
+                  sendMessage("deleteWorkflow", workflow.id),
+                  onChanged
+                );
               }}
               type="button"
             >

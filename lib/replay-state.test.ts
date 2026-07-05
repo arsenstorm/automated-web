@@ -5,7 +5,7 @@ import {
   pausedRun,
   resumedRun,
   startedRun,
-} from "./replay";
+} from "./replay-state";
 
 describe("run-state transitions", () => {
   it("advances through steps and finishes", () => {

@@ -10,6 +10,13 @@ const SENSITIVE_AUTOCOMPLETE = /password|cc-/;
 
 const buffer: RecordedEvent[] = [];
 let suppressUntil = 0;
+// Off by default: secret values are redacted at capture unless the user
+// opts in via settings (synced by index.ts).
+let recordSecrets = false;
+
+export const setRecordSecrets = (enabled: boolean) => {
+  recordSecrets = enabled;
+};
 
 /** Pause recording briefly, e.g. around replayed steps. */
 export const suppressRecording = (ms: number) => {
@@ -81,8 +88,14 @@ export const onChange = (event: Event) => {
   if (existing >= 0) {
     buffer.splice(existing, 1);
   }
-  // Plaintext in the buffer only; the background encrypts at rest.
-  record({ kind: "input", selector, value: el.value, sensitive });
+  // Unless opted in, secret values never leave the page: the step is kept
+  // as a placeholder (replay pauses on it) but the value is dropped here.
+  record({
+    kind: "input",
+    selector,
+    value: sensitive && !recordSecrets ? "" : el.value,
+    sensitive,
+  });
 };
 
 export const onSubmit = (event: Event) => {

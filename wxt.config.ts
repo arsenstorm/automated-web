@@ -10,14 +10,15 @@ export default defineConfig({
     // (wired via setPanelBehavior in the background).
     action: {},
     permissions: [
-      "alarms",
-      "storage",
-      "tabs",
-      "scripting",
-      "activeTab",
-      "notifications",
-      "sidePanel",
+      "alarms", // periodic pattern mining while the service worker sleeps
+      "storage", // workflows/events/patterns (encrypted) + settings
+      "notifications", // "workflow stuck / finished" alerts
+      "sidePanel", // the UI lives in the side panel
     ],
+    // Passive capture works wherever the user browses, so the content script
+    // runs everywhere. Host access also grants tab.url reads, which is why
+    // "tabs" isn't requested. ponytail: prototype-wide; move to
+    // optional_host_permissions with per-site opt-in before a store release.
     host_permissions: ["<all_urls>"],
     ...(browser === "firefox" && {
       browser_specific_settings: {

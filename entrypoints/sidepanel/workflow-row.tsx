@@ -2,12 +2,13 @@
 
 import { Play, RotateCcw, Square } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { sendMessage } from "@/lib/messaging";
+import { IconButton } from "@/components/buttons";
+import { Expand, IconSwap } from "@/components/transitions";
+import { fireAndForget, sendMessage } from "@/lib/messaging";
 import type { RunState, Workflow } from "@/lib/types";
 import { InlinePlayer } from "./inline-player";
 import { RenameForm } from "./rename-form";
 import { RowMenu } from "./row-menu";
-import { Expand, IconButton, IconSwap } from "./ui";
 
 /** A finished run lingers briefly so the full bar is seen, then clears. */
 const DONE_CLEAR_MS = 3000;
@@ -35,13 +36,13 @@ export function WorkflowRow({
       return;
     }
     const timer = setTimeout(() => {
-      sendMessage("cancelRun").then(onChanged);
+      fireAndForget(sendMessage("cancelRun"), onChanged);
     }, DONE_CLEAR_MS);
     return () => clearTimeout(timer);
   }, [done, onChanged]);
 
   const play = () => {
-    sendMessage("startRun", workflow.id).then(onChanged);
+    fireAndForget(sendMessage("startRun", workflow.id), onChanged);
   };
 
   /** The row's single play/stop/replay control, keyed for icon crossfades. */
@@ -80,7 +81,7 @@ export function WorkflowRow({
           ? `Clear run of ${workflow.name}`
           : `Stop ${workflow.name}`,
       onClick: () => {
-        sendMessage("cancelRun").then(onChanged);
+        fireAndForget(sendMessage("cancelRun"), onChanged);
       },
     };
   }

@@ -1,6 +1,6 @@
 /** Replay step executor: waits for elements and applies recorded actions. */
 
-import { hasCaptcha } from "@/lib/replay";
+import { hasCaptcha } from "@/lib/replay-state";
 import { findByText, lastTag, trimmedText } from "@/lib/selector";
 import type { StepAction, StepResult } from "@/lib/types";
 import { suppressRecording } from "./recorder";
@@ -81,6 +81,19 @@ export const executeStep = async (step: StepAction): Promise<StepResult> => {
   }
   if (!el) {
     return { ok: false, reason: "timeout", detail: step.selector };
+  }
+  // A secret with no stored value (the default — storing them is opt-in):
+  // focus the field and pause for the user to type it, then skip the step.
+  if (step.kind === "input" && step.sensitive && !step.value) {
+    el.scrollIntoView({ block: "center" });
+    if (el instanceof HTMLElement) {
+      el.focus();
+    }
+    return {
+      ok: false,
+      reason: "secret",
+      detail: "enter it on the page, then skip",
+    };
   }
   suppressRecording(REPLAY_SUPPRESS_MS);
   applyStep(el, step);

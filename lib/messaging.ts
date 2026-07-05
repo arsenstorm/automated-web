@@ -53,3 +53,15 @@ export interface ProtocolMap {
 
 export const { sendMessage, onMessage } =
   defineExtensionMessaging<ProtocolMap>();
+
+/**
+ * Fire-and-forget for UI handlers and the background: log a failure instead
+ * of leaving an unhandled rejection, and still run `after` so views resync
+ * to whatever state actually stuck.
+ */
+export function fireAndForget(
+  promise: Promise<unknown>,
+  after?: () => void
+): void {
+  promise.catch((error) => console.error(error)).finally(() => after?.());
+}

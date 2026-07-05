@@ -1,9 +1,9 @@
 /** Inline name editor for a workflow row. */
 
 import { useEffect, useRef, useState } from "react";
-import { sendMessage } from "@/lib/messaging";
+import { FOCUS_RING_INSET } from "@/components/styles";
+import { fireAndForget, sendMessage } from "@/lib/messaging";
 import type { Workflow } from "@/lib/types";
-import { FOCUS_RING_INSET } from "./ui";
 
 export function RenameForm({
   workflow,
@@ -29,7 +29,8 @@ export function RenameForm({
   const submit = (restoreFocus: boolean) => {
     const trimmed = name.trim();
     if (trimmed && trimmed !== workflow.name) {
-      sendMessage("renameWorkflow", { id: workflow.id, name: trimmed }).then(
+      fireAndForget(
+        sendMessage("renameWorkflow", { id: workflow.id, name: trimmed }),
         () => onDone(restoreFocus)
       );
       return;

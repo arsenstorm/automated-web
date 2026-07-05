@@ -3,10 +3,11 @@
 import { cn } from "cnfast";
 import { Play, SkipForward } from "lucide-react";
 import { motion } from "motion/react";
-import { sendMessage } from "@/lib/messaging";
+import { Badge, type BadgeTone } from "@/components/badge";
+import { IconButton } from "@/components/buttons";
+import { fireAndForget, sendMessage } from "@/lib/messaging";
 import type { RunState, RunStatus } from "@/lib/types";
 import { useReducedMotion } from "./motion";
-import { Badge, type BadgeTone, IconButton } from "./ui";
 
 const RUN_TONES: Record<RunStatus, BadgeTone> = {
   running: "neutral",
@@ -50,20 +51,23 @@ export function InlinePlayer({
           transition={reducedMotion ? { duration: 0 } : undefined}
         />
       </div>
-      <div className="mt-1.5 flex items-center justify-between gap-2">
-        <div aria-live="polite" className="flex min-w-0 items-center gap-2">
-          <Badge tone={RUN_TONES[run.status]}>{run.status}</Badge>
+      <div className="mt-1.5 flex items-center gap-2">
+        <div
+          aria-live="polite"
+          className="flex min-w-0 flex-1 items-center justify-between gap-2"
+        >
           <p className="min-w-0 truncate text-muted-foreground text-sm tabular-nums">
             Step {Math.min(Math.max(run.stepIndex, 1), steps)} of {steps}
             {run.pausedReason ? ` — ${run.pausedReason}` : ""}
           </p>
+          <Badge tone={RUN_TONES[run.status]}>{run.status}</Badge>
         </div>
         {run.status === "paused" && (
           <div className="flex shrink-0 gap-1">
             <IconButton
               label="Resume"
               onClick={() => {
-                sendMessage("resumeRun").then(onChanged);
+                fireAndForget(sendMessage("resumeRun"), onChanged);
               }}
             >
               <Play
@@ -74,7 +78,7 @@ export function InlinePlayer({
             <IconButton
               label="Skip step"
               onClick={() => {
-                sendMessage("skipStep").then(onChanged);
+                fireAndForget(sendMessage("skipStep"), onChanged);
               }}
             >
               <SkipForward aria-hidden="true" className="size-4 shrink-0" />

@@ -7,7 +7,7 @@ import {
   generateRandomKey,
   importKey,
   randomSalt,
-} from "./vault";
+} from "./vault-crypto";
 
 describe("vault crypto", () => {
   it("roundtrips a value with a random key", async () => {

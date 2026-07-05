@@ -3,15 +3,10 @@
 import { cn } from "cnfast";
 import { CircleCheck, KeyRound, ShieldCheck, Sparkles } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { StepCard } from "@/components/step-card";
+import { GHOST_TEXT_BUTTON, INPUT, PRIMARY_BUTTON } from "@/components/styles";
+import { IconSwap, StepFlow } from "@/components/transitions";
 import { sendMessage } from "@/lib/messaging";
-import {
-  GHOST_TEXT_BUTTON,
-  IconSwap,
-  INPUT,
-  PRIMARY_BUTTON,
-  StepCard,
-  StepFlow,
-} from "./ui";
 
 type Step = "welcome" | "vault" | "password" | "done";
 

@@ -2,7 +2,8 @@
 
 import { Circle, Plus, Square } from "lucide-react";
 import { useState } from "react";
-import { IconButton, IconSwap } from "./ui";
+import { IconButton } from "@/components/buttons";
+import { IconSwap } from "@/components/transitions";
 
 export function RecordButton({
   recording,

@@ -1,4 +1,4 @@
-import { onMessage } from "@/lib/messaging";
+import { fireAndForget, onMessage } from "@/lib/messaging";
 import { getStored, setStored } from "@/lib/storage";
 import { EVENT_BUFFER_CAP } from "@/lib/types";
 import { dismissSuggestion, runMiner, saveSuggestion } from "./mining";
@@ -18,10 +18,6 @@ import {
 const MINE_ALARM = "mine";
 const MINE_PERIOD_MINUTES = 1;
 
-const catching = (promise: Promise<unknown>) => {
-  promise.catch((error) => console.error(error));
-};
-
 export default defineBackground(() => {
   // Open the side panel when the toolbar icon is clicked (Chromium only).
   browser.sidePanel
@@ -31,11 +27,11 @@ export default defineBackground(() => {
   browser.alarms.create(MINE_ALARM, { periodInMinutes: MINE_PERIOD_MINUTES });
   browser.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === MINE_ALARM) {
-      catching(runMiner());
+      fireAndForget(runMiner());
     }
   });
 
-  catching(pauseInterruptedRun());
+  fireAndForget(pauseInterruptedRun());
 
   onMessage("ping", () => {
     // Liveness check.
@@ -79,13 +75,13 @@ export default defineBackground(() => {
     );
   });
   onMessage("startRun", ({ data }) => {
-    catching(startRun(data));
+    fireAndForget(startRun(data));
   });
   onMessage("skipStep", () => {
-    catching(continueRun({ skip: true }));
+    fireAndForget(continueRun({ skip: true }));
   });
   onMessage("resumeRun", () => {
-    catching(continueRun({ skip: false }));
+    fireAndForget(continueRun({ skip: false }));
   });
   onMessage("cancelRun", () => setStored("run", null));
   onMessage("getRunState", () => getStored("run"));

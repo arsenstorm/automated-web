@@ -2,7 +2,8 @@
 
 import { cn } from "cnfast";
 import { Workflow } from "lucide-react";
-import { ErrorNotice, PRIMARY_BUTTON } from "./ui";
+import { ErrorNotice } from "@/components/error-notice";
+import { PRIMARY_BUTTON } from "@/components/styles";
 
 export function EmptyState({
   onRecord,

@@ -2,9 +2,15 @@
 
 import { cn } from "cnfast";
 import { X } from "lucide-react";
-import { type ReactNode, useState } from "react";
-import { sendMessage, type VaultStatus } from "@/lib/messaging";
-import { Expand, IconButton, INPUT, SmallButton, ViewTitle } from "./ui";
+import { type ReactNode, useEffect, useState } from "react";
+import { IconButton, SmallButton } from "@/components/buttons";
+import { INPUT } from "@/components/styles";
+import { Switch } from "@/components/switch";
+import { Expand } from "@/components/transitions";
+import { ViewTitle } from "@/components/view-title";
+import { fireAndForget, sendMessage, type VaultStatus } from "@/lib/messaging";
+import { getStored, setStored } from "@/lib/storage";
+import type { Settings } from "@/lib/types";
 
 /** Option row: label and action share a line, description runs full width. */
 function SettingRow({
@@ -26,6 +32,37 @@ function SettingRow({
         {description}
       </p>
     </div>
+  );
+}
+
+function RecordingSettings() {
+  const [settings, setSettings] = useState<Settings | null>(null);
+
+  useEffect(() => {
+    fireAndForget(getStored("settings").then(setSettings));
+  }, []);
+
+  const setRecordSecrets = (recordSecrets: boolean) => {
+    if (!settings) {
+      return;
+    }
+    const next = { ...settings, recordSecrets };
+    setSettings(next);
+    setStored("settings", next).catch(() => null);
+  };
+
+  return (
+    <SettingRow
+      description="Keep passwords and card numbers in the encrypted vault so replay can fill them."
+      label="Store secret fields"
+    >
+      <Switch
+        checked={settings?.recordSecrets ?? false}
+        disabled={settings === null}
+        label="Store secret fields"
+        onChange={setRecordSecrets}
+      />
+    </SettingRow>
   );
 }
 
@@ -101,7 +138,7 @@ function VaultSettings({
         <SmallButton
           disabled={!hasPassword}
           onClick={() => {
-            sendMessage("lockVault").then(onChanged);
+            fireAndForget(sendMessage("lockVault"), onChanged);
           }}
         >
           Lock
@@ -129,6 +166,7 @@ export function SettingsView({
         </IconButton>
       </header>
       <VaultSettings onChanged={onChanged} status={status} />
+      <RecordingSettings />
     </main>
   );
 }

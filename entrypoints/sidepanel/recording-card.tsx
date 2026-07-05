@@ -1,8 +1,8 @@
 /** Centered recording state: pulsing dot, heading, stop and cancel. */
 
 import { cn } from "cnfast";
+import { DESTRUCTIVE_BUTTON, GHOST_TEXT_BUTTON } from "@/components/styles";
 import type { RecordingState } from "@/lib/types";
-import { DESTRUCTIVE_BUTTON, GHOST_TEXT_BUTTON } from "./ui";
 
 export function RecordingCard({
   recording,

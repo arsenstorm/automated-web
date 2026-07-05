@@ -4,16 +4,16 @@ import { cn } from "cnfast";
 import { KeyRound, Lock, TriangleAlert } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useEffect, useState } from "react";
-import { sendMessage } from "@/lib/messaging";
-import { useAnimDuration, useCrossfade } from "./motion";
+import { StepCard } from "@/components/step-card";
 import {
   DESTRUCTIVE_BUTTON,
   GHOST_TEXT_BUTTON,
   INPUT,
   PRIMARY_BUTTON,
-  StepCard,
-  StepFlow,
-} from "./ui";
+} from "@/components/styles";
+import { StepFlow } from "@/components/transitions";
+import { fireAndForget, sendMessage } from "@/lib/messaging";
+import { useAnimDuration, useCrossfade } from "./motion";
 
 type Step = "unlock" | "explain" | "confirm" | "reset";
 
@@ -53,7 +53,7 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
   };
 
   const reset = () => {
-    sendMessage("resetVault").then(onUnlocked);
+    fireAndForget(sendMessage("resetVault"), onUnlocked);
   };
 
   const steps: Record<Step, ReactNode> = {
