@@ -1,0 +1,12 @@
+diff --git a/dist/core/utils/content-scripts.mjs b/dist/core/utils/content-scripts.mjs
+index 3ea87b0957f998a0ef1aa9532eb8943ae45d27cf..c10b982836f49c9aeec45d42c4f372069738c921 100644
+--- a/dist/core/utils/content-scripts.mjs
++++ b/dist/core/utils/content-scripts.mjs
+@@ -45,6 +45,7 @@ function mapWxtOptionsToContentScript(options, js, css) {
+ function mapWxtOptionsToRegisteredContentScript(options, js, css) {
+ 	return {
+ 		allFrames: options.allFrames,
++		matchOriginAsFallback: options.matchOriginAsFallback,
+ 		excludeMatches: options.excludeMatches,
+ 		matches: options.matches,
+ 		runAt: options.runAt,
