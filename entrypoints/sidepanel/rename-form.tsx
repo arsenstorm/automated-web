@@ -9,7 +9,12 @@ export function RenameForm({
   onDone,
 }: {
   workflow: Workflow;
-  onDone: () => void;
+  /**
+   * restoreFocus is true when the edit ended via keyboard (Enter/Escape) —
+   * the caller should refocus the row. On blur the user has already moved
+   * focus elsewhere, so stealing it back would be wrong.
+   */
+  onDone: (restoreFocus: boolean) => void;
 }) {
   // Starts empty with the current/suggested name as placeholder; an empty
   // submit accepts the placeholder.
@@ -20,15 +25,15 @@ export function RenameForm({
     inputRef.current?.focus();
   }, []);
 
-  const submit = () => {
+  const submit = (restoreFocus: boolean) => {
     const trimmed = name.trim();
     if (trimmed && trimmed !== workflow.name) {
       sendMessage("renameWorkflow", { id: workflow.id, name: trimmed }).then(
-        onDone
+        () => onDone(restoreFocus)
       );
       return;
     }
-    onDone();
+    onDone(restoreFocus);
   };
 
   return (
@@ -39,7 +44,7 @@ export function RenameForm({
       className="-mx-2 -my-1"
       onSubmit={(event) => {
         event.preventDefault();
-        submit();
+        submit(true);
       }}
     >
       <label className="sr-only" htmlFor={`rename-${workflow.id}`}>
@@ -49,11 +54,11 @@ export function RenameForm({
         className="w-full rounded-md bg-transparent px-2 py-1 font-medium text-sm ring-1 ring-input placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-1"
         id={`rename-${workflow.id}`}
         name={`rename-${workflow.id}`}
-        onBlur={submit}
+        onBlur={() => submit(false)}
         onChange={(event) => setName(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Escape") {
-            onDone();
+            onDone(true);
           }
         }}
         placeholder={workflow.name}

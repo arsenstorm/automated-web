@@ -3,8 +3,8 @@
 import { cn } from "cnfast";
 import { TriangleAlert } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import type { ReactNode } from "react";
-import { CROSSFADE, crossfade } from "./motion";
+import { type ReactNode, useEffect, useRef } from "react";
+import { useAnimDuration, useCrossfade, usePageCrossfade } from "./motion";
 
 export const INPUT =
   "w-full rounded-md border border-input bg-transparent px-2.5 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-1";
@@ -12,8 +12,10 @@ export const INPUT =
 export const PRIMARY_BUTTON =
   "rounded-md bg-primary px-3 py-2 font-medium text-primary-foreground text-sm hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
+// Dark text in dark mode: the dark --destructive is a light red, and white
+// on it is only 2.9:1.
 export const DESTRUCTIVE_BUTTON =
-  "rounded-md bg-destructive px-3 py-2 font-medium text-sm text-white hover:bg-destructive/90 focus-visible:outline-2 focus-visible:outline-destructive focus-visible:outline-offset-2";
+  "rounded-md bg-destructive px-3 py-2 font-medium text-sm text-white hover:bg-destructive/90 focus-visible:outline-2 focus-visible:outline-destructive focus-visible:outline-offset-2 dark:text-zinc-950";
 
 export const GHOST_TEXT_BUTTON =
   "rounded-md px-3 py-1.5 font-medium text-muted-foreground text-sm hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2";
@@ -42,12 +44,35 @@ export function StepCard({
       >
         {icon}
       </div>
-      <h1 className="mt-4 font-medium text-sm">{title}</h1>
+      <ViewTitle className="mt-4 font-medium text-sm">{title}</ViewTitle>
       <p className="mt-1 max-w-56 text-pretty text-muted-foreground text-sm">
         {description}
       </p>
       {children}
     </>
+  );
+}
+
+/**
+ * View/step heading that takes focus on mount, so keyboard and screen-reader
+ * users land on the new view after a swap instead of dropping to the body
+ * when the previous view unmounts.
+ */
+export function ViewTitle({
+  className,
+  children,
+}: {
+  className?: string;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    ref.current?.focus();
+  }, []);
+  return (
+    <h1 className={cn("outline-none", className)} ref={ref} tabIndex={-1}>
+      {children}
+    </h1>
   );
 }
 
@@ -83,7 +108,8 @@ export function SmallButton({
 }
 
 const ICON_BUTTON_VARIANTS = {
-  destructive: "bg-destructive text-white hover:bg-destructive/90",
+  destructive:
+    "bg-destructive text-white hover:bg-destructive/90 dark:text-zinc-950",
   ghost:
     "text-muted-foreground hover:bg-secondary hover:text-secondary-foreground",
   primary: "bg-primary text-primary-foreground hover:bg-primary/90",
@@ -99,6 +125,7 @@ export function IconButton({
   onFocus,
   onMouseEnter,
   onMouseLeave,
+  expanded,
 }: {
   label: string;
   onClick: () => void;
@@ -109,9 +136,12 @@ export function IconButton({
   onFocus?: () => void;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
+  /** For popover triggers: sets aria-expanded. */
+  expanded?: boolean;
 }) {
   return (
     <button
+      aria-expanded={expanded}
       className={cn(
         "relative rounded-md p-1.5 focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-50",
         ICON_BUTTON_VARIANTS[variant]
@@ -139,6 +169,7 @@ export function Expand({
   show: boolean;
   children: ReactNode;
 }) {
+  const duration = useAnimDuration();
   return (
     <AnimatePresence initial={false}>
       {show && (
@@ -147,7 +178,7 @@ export function Expand({
           className="overflow-hidden"
           exit={{ height: 0, opacity: 0 }}
           initial={{ height: 0, opacity: 0 }}
-          transition={{ duration: 0.15 }}
+          transition={{ duration }}
         >
           {children}
         </motion.div>
@@ -157,14 +188,22 @@ export function Expand({
 }
 
 /** Centered inline error that animates in and out; nothing when null. */
-export function ErrorNotice({ message }: { message: string | null }) {
+export function ErrorNotice({
+  message,
+  className,
+}: {
+  message: string | null;
+  className?: string;
+}) {
   return (
-    <Expand show={message !== null}>
-      <p className="flex items-center justify-center gap-1.5 py-3 text-destructive text-sm">
-        <TriangleAlert aria-hidden="true" className="size-4 shrink-0" />
-        {message}
-      </p>
-    </Expand>
+    <div className={className} role="status">
+      <Expand show={message !== null}>
+        <p className="flex items-center justify-center gap-1.5 py-3 text-destructive text-sm">
+          <TriangleAlert aria-hidden="true" className="size-4 shrink-0" />
+          {message}
+        </p>
+      </Expand>
+    </div>
   );
 }
 
@@ -176,11 +215,12 @@ export function StepFlow({
   stepKey: string;
   children: ReactNode;
 }) {
+  const fade = usePageCrossfade();
   return (
     <main className="flex flex-1 flex-col justify-center">
       <AnimatePresence initial={false} mode="popLayout">
         <motion.div
-          {...CROSSFADE}
+          {...fade}
           className="flex flex-col items-center px-4 py-8 text-center"
           key={stepKey}
         >
@@ -199,9 +239,10 @@ export function IconSwap({
   id: string;
   children: ReactNode;
 }) {
+  const fade = useCrossfade(0.9);
   return (
     <AnimatePresence initial={false} mode="popLayout">
-      <motion.span {...crossfade(0.9)} className="flex" key={id}>
+      <motion.span {...fade} className="flex" key={id}>
         {children}
       </motion.span>
     </AnimatePresence>

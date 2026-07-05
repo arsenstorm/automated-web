@@ -1,3 +1,4 @@
+import { MotionConfig } from "motion/react";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./app.tsx";
@@ -10,6 +11,8 @@ if (!root) {
 
 ReactDOM.createRoot(root).render(
   <React.StrictMode>
-    <App />
+    <MotionConfig reducedMotion="user">
+      <App />
+    </MotionConfig>
   </React.StrictMode>
 );

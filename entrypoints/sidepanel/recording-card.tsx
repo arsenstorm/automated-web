@@ -17,7 +17,7 @@ export function RecordingCard({
     <div className="flex flex-col items-center px-4 py-12 text-center">
       <div className="flex size-10 items-center justify-center rounded-lg bg-destructive/10">
         <span aria-hidden="true" className="relative flex size-2.5">
-          <span className="absolute inline-flex size-full animate-ping rounded-full bg-destructive opacity-75" />
+          <span className="absolute inline-flex size-full animate-ping rounded-full bg-destructive opacity-75 motion-reduce:hidden" />
           <span className="relative inline-flex size-2.5 rounded-full bg-destructive" />
         </span>
       </div>

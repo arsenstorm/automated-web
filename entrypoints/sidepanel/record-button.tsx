@@ -24,7 +24,7 @@ export function RecordButton({
     ) : (
       <Circle
         aria-hidden="true"
-        className="size-4 shrink-0 animate-pulse fill-current"
+        className="size-4 shrink-0 animate-pulse fill-current motion-reduce:animate-none"
       />
     );
   }

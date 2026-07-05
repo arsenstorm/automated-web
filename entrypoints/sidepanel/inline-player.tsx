@@ -5,6 +5,7 @@ import { Play, SkipForward } from "lucide-react";
 import { motion } from "motion/react";
 import { sendMessage } from "@/lib/messaging";
 import type { RunState, RunStatus } from "@/lib/types";
+import { useReducedMotion } from "./motion";
 import { Badge, type BadgeTone, IconButton } from "./ui";
 
 const RUN_TONES: Record<RunStatus, BadgeTone> = {
@@ -25,6 +26,7 @@ export function InlinePlayer({
   total: number;
   onChanged: () => void;
 }) {
+  const reducedMotion = useReducedMotion();
   // Step 0 is the initial navigate — the page the run starts on, not work.
   // Number and measure progress against the real steps only.
   const steps = Math.max(total - 1, 1);
@@ -45,10 +47,11 @@ export function InlinePlayer({
             run.status === "failed" ? "bg-destructive" : "bg-primary"
           )}
           initial={false}
+          transition={reducedMotion ? { duration: 0 } : undefined}
         />
       </div>
       <div className="mt-1.5 flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
+        <div aria-live="polite" className="flex min-w-0 items-center gap-2">
           <Badge tone={RUN_TONES[run.status]}>{run.status}</Badge>
           <p className="min-w-0 truncate text-muted-foreground text-sm tabular-nums">
             Step {Math.min(Math.max(run.stepIndex, 1), steps)} of {steps}

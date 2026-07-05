@@ -31,8 +31,11 @@ export function WorkflowList({
   return (
     <div className="flex flex-col gap-4">
       {hosts.map((host) => (
-        <section key={host}>
-          <h2 className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+        <section aria-labelledby={`workflows-${host}`} key={host}>
+          <h2
+            className="font-medium text-muted-foreground text-xs uppercase tracking-wide"
+            id={`workflows-${host}`}
+          >
             {host}
           </h2>
           <ul className="mt-1 divide-y divide-border">

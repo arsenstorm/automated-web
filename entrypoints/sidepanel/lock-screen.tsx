@@ -5,7 +5,7 @@ import { KeyRound, Lock, TriangleAlert } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { type ReactNode, useEffect, useState } from "react";
 import { sendMessage } from "@/lib/messaging";
-import { crossfade } from "./motion";
+import { useAnimDuration, useCrossfade } from "./motion";
 import {
   DESTRUCTIVE_BUTTON,
   GHOST_TEXT_BUTTON,
@@ -24,6 +24,8 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
   const [password, setPassword] = useState("");
   /** Wrong password: red outline on the input until typing or a timeout. */
   const [error, setError] = useState(false);
+  const fade = useCrossfade();
+  const duration = useAnimDuration();
 
   useEffect(() => {
     if (!error) {
@@ -58,17 +60,20 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
     unlock: (
       <StepCard
         description={
-          <AnimatePresence initial={false} mode="popLayout">
-            <motion.span
-              {...crossfade()}
-              className={cn("block", error && "text-destructive")}
-              key={error ? "error" : "hint"}
-            >
-              {error
-                ? "That password isn't right — give it another try."
-                : "Enter your vault password to record and run workflows."}
-            </motion.span>
-          </AnimatePresence>
+          // Persistent live region so the wrong-password swap is announced.
+          <span className="block" id="unlock-message" role="status">
+            <AnimatePresence initial={false} mode="popLayout">
+              <motion.span
+                {...fade}
+                className={cn("block", error && "text-destructive")}
+                key={error ? "error" : "hint"}
+              >
+                {error
+                  ? "That password isn't right — give it another try."
+                  : "Enter your vault password to record and run workflows."}
+              </motion.span>
+            </AnimatePresence>
+          </span>
         }
         icon={
           <Lock aria-hidden="true" className="size-5 text-muted-foreground" />
@@ -100,6 +105,7 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
                     boxShadow: "0 0 0 0px transparent, 0 0 0 0px transparent",
                   }
             }
+            aria-describedby="unlock-message"
             aria-invalid={error}
             className={cn(
               INPUT,
@@ -114,7 +120,7 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
             }}
             placeholder="Vault password"
             required
-            transition={{ duration: 0.15 }}
+            transition={{ duration }}
             type="password"
             value={password}
           />

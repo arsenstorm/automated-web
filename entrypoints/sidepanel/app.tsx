@@ -6,12 +6,12 @@ import { getStored, setStored } from "@/lib/storage";
 import type { RecordingState, RunState, Workflow } from "@/lib/types";
 import { EmptyState } from "./empty-state";
 import { LockScreen } from "./lock-screen";
-import { CROSSFADE } from "./motion";
+import { usePageCrossfade } from "./motion";
 import { Onboarding } from "./onboarding";
 import { RecordButton } from "./record-button";
 import { RecordingCard } from "./recording-card";
 import { SettingsView } from "./settings";
-import { ErrorNotice, Expand, Footer, IconButton } from "./ui";
+import { ErrorNotice, Expand, Footer, IconButton, ViewTitle } from "./ui";
 import { WorkflowList } from "./workflow-list";
 
 const RUN_POLL_MS = 1000;
@@ -26,6 +26,7 @@ function App() {
   const [recordError, setRecordError] = useState<string | null>(null);
   /** Freshly saved recording — its row opens with a name prompt. */
   const [namingId, setNamingId] = useState<string | null>(null);
+  const pageFade = usePageCrossfade();
 
   const refresh = useCallback(() => {
     sendMessage("vaultStatus", undefined).then(setVaultStatus);
@@ -91,7 +92,7 @@ function App() {
   const mainView = (
     <main className="flex flex-1 flex-col gap-5">
       <header className="flex items-center justify-between gap-3">
-        <h1 className="font-semibold text-sm">Workflows</h1>
+        <ViewTitle className="font-semibold text-sm">Workflows</ViewTitle>
         <div className="flex gap-1">
           {workflows.length > 0 && (
             <RecordButton
@@ -107,7 +108,7 @@ function App() {
       </header>
       {workflows.length === 0 ? (
         <AnimatePresence initial={false} mode="popLayout">
-          <motion.div {...CROSSFADE} key={recording ? "recording" : "empty"}>
+          <motion.div {...pageFade} key={recording ? "recording" : "empty"}>
             {recording ? (
               <RecordingCard
                 onCancel={cancelRecord}
@@ -132,7 +133,7 @@ function App() {
               />
             )}
           </Expand>
-          <ErrorNotice message={recordError} />
+          <ErrorNotice className="-mt-3! mb-2" message={recordError} />
           <WorkflowList
             namingId={namingId}
             onChanged={refresh}
@@ -174,7 +175,7 @@ function App() {
     <div className="isolate flex min-h-dvh min-w-64 flex-col p-4 antialiased">
       <AnimatePresence initial={false} mode="popLayout">
         <motion.div
-          {...CROSSFADE}
+          {...pageFade}
           className="flex flex-1 flex-col"
           key={pageKey}
         >

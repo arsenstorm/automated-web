@@ -4,7 +4,7 @@ import { cn } from "cnfast";
 import { X } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { sendMessage, type VaultStatus } from "@/lib/messaging";
-import { Expand, IconButton, INPUT, SmallButton } from "./ui";
+import { Expand, IconButton, INPUT, SmallButton, ViewTitle } from "./ui";
 
 /** Option row: label and action share a line, description runs full width. */
 function SettingRow({
@@ -123,7 +123,7 @@ export function SettingsView({
   return (
     <main className="flex flex-1 flex-col gap-5">
       <header className="flex items-center justify-between gap-3">
-        <h1 className="font-semibold text-sm">Settings</h1>
+        <ViewTitle className="font-semibold text-sm">Settings</ViewTitle>
         <IconButton label="Back to workflows" onClick={onBack}>
           <X aria-hidden="true" className="size-4 shrink-0" />
         </IconButton>
