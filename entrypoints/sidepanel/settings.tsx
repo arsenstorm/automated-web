@@ -101,7 +101,7 @@ function VaultSettings({
         <SmallButton
           disabled={!hasPassword}
           onClick={() => {
-            sendMessage("lockVault", undefined).then(onChanged);
+            sendMessage("lockVault").then(onChanged);
           }}
         >
           Lock

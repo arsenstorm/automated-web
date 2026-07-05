@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { sendMessage } from "@/lib/messaging";
 import type { Workflow } from "@/lib/types";
+import { FOCUS_RING_INSET } from "./ui";
 
 export function RenameForm({
   workflow,
@@ -51,7 +52,7 @@ export function RenameForm({
         Workflow name
       </label>
       <input
-        className="w-full rounded-md bg-transparent px-2 py-1 font-medium text-sm ring-1 ring-input placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-1"
+        className={`w-full rounded-md bg-transparent px-2 py-1 font-medium text-sm ring-1 ring-input placeholder:text-muted-foreground ${FOCUS_RING_INSET}`}
         id={`rename-${workflow.id}`}
         name={`rename-${workflow.id}`}
         onBlur={() => submit(false)}

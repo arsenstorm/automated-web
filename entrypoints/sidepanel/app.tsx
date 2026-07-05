@@ -29,11 +29,11 @@ function App() {
   const pageFade = usePageCrossfade();
 
   const refresh = useCallback(() => {
-    sendMessage("vaultStatus", undefined).then(setVaultStatus);
+    sendMessage("vaultStatus").then(setVaultStatus);
     getStored("onboarded").then(setOnboarded);
-    sendMessage("listWorkflows", undefined).then(setWorkflows);
-    sendMessage("getRunState", undefined).then(setRun);
-    sendMessage("getRecording", undefined).then(setRecording);
+    sendMessage("listWorkflows").then(setWorkflows);
+    sendMessage("getRunState").then(setRun);
+    sendMessage("getRecording").then(setRecording);
   }, []);
 
   useEffect(() => {
@@ -59,7 +59,7 @@ function App() {
 
   const record = async () => {
     setRecordError(null);
-    const started = await sendMessage("startRecording", undefined);
+    const started = await sendMessage("startRecording");
     if (!started) {
       setRecordError("Open the page you want to record first.");
     }
@@ -68,7 +68,7 @@ function App() {
 
   const stopRecord = async () => {
     // A stop with nothing recorded quietly discards, same as cancel.
-    const workflow = await sendMessage("stopRecording", undefined);
+    const workflow = await sendMessage("stopRecording");
     if (workflow) {
       setNamingId(workflow.id);
     }
@@ -82,7 +82,7 @@ function App() {
     stopRecord().catch(() => null);
   };
   const cancelRecord = () => {
-    sendMessage("cancelRecording", undefined).then(refresh);
+    sendMessage("cancelRecording").then(refresh);
   };
 
   if (vaultStatus === null || onboarded === null) {

@@ -3,23 +3,25 @@
 import { cn } from "cnfast";
 import { EllipsisVertical } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useRef, useState } from "react";
+import { type RefObject, useEffect, useRef, useState } from "react";
 import { sendMessage } from "@/lib/messaging";
 import type { Workflow } from "@/lib/types";
 import { useAnimDuration } from "./motion";
-import { IconButton } from "./ui";
+import { FOCUS_RING_INSET, IconButton } from "./ui";
 
-const MENU_ITEM =
-  "block w-full rounded-sm px-2 py-1 text-left text-sm hover:bg-secondary focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-ring";
+const MENU_ITEM = `block w-full rounded-sm px-2 py-1 text-left text-sm hover:bg-secondary ${FOCUS_RING_INSET}`;
 
 export function RowMenu({
   workflow,
   onRename,
   onChanged,
+  triggerRef,
 }: {
   workflow: Workflow;
   onRename: () => void;
   onChanged: () => void;
+  /** The options trigger — the row also refocuses it after a rename. */
+  triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
   const [open, setOpen] = useState(false);
   /** Delete asks once: first click arms, second click deletes. */
@@ -43,9 +45,8 @@ export function RowMenu({
     const onDocKeydown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setOpen(false);
-        // The trigger is the container's first button; menu items unmount,
-        // so without this focus would drop to the body.
-        containerRef.current?.querySelector("button")?.focus();
+        // Menu items unmount; without this focus would drop to the body.
+        triggerRef.current?.focus();
       }
     };
     document.addEventListener("mousedown", onDocMousedown);
@@ -54,14 +55,15 @@ export function RowMenu({
       document.removeEventListener("mousedown", onDocMousedown);
       document.removeEventListener("keydown", onDocKeydown);
     };
-  }, [open]);
+  }, [open, triggerRef]);
 
   return (
     <div className="relative" ref={containerRef}>
       <IconButton
-        expanded={open}
+        aria-expanded={open}
         label={`Options for ${workflow.name}`}
         onClick={() => setOpen((wasOpen) => !wasOpen)}
+        ref={triggerRef}
       >
         <EllipsisVertical aria-hidden="true" className="size-4 shrink-0" />
       </IconButton>

@@ -25,7 +25,7 @@ export function WorkflowRow({
   onChanged: () => void;
 }) {
   const [renaming, setRenaming] = useState(workflow.id === namingId);
-  const rowRef = useRef<HTMLLIElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
   const active = run?.workflowId === workflow.id;
   const done = active && run?.status === "done";
   const runBusy = run !== null && run.status !== "done";
@@ -35,7 +35,7 @@ export function WorkflowRow({
       return;
     }
     const timer = setTimeout(() => {
-      sendMessage("cancelRun", undefined).then(onChanged);
+      sendMessage("cancelRun").then(onChanged);
     }, DONE_CLEAR_MS);
     return () => clearTimeout(timer);
   }, [done, onChanged]);
@@ -80,13 +80,13 @@ export function WorkflowRow({
           ? `Clear run of ${workflow.name}`
           : `Stop ${workflow.name}`,
       onClick: () => {
-        sendMessage("cancelRun", undefined).then(onChanged);
+        sendMessage("cancelRun").then(onChanged);
       },
     };
   }
 
   return (
-    <li className="py-2" ref={rowRef}>
+    <li className="py-2">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
           {renaming ? (
@@ -95,9 +95,9 @@ export function WorkflowRow({
                 setRenaming(false);
                 onChanged();
                 if (restoreFocus) {
-                  // Second button in the row is the options-menu trigger,
-                  // where the rename began; the input is about to unmount.
-                  rowRef.current?.querySelectorAll("button")[1]?.focus();
+                  // Back to the options menu, where the rename began; the
+                  // input is about to unmount.
+                  menuButtonRef.current?.focus();
                 }
               }}
               workflow={workflow}
@@ -117,6 +117,7 @@ export function WorkflowRow({
           <RowMenu
             onChanged={onChanged}
             onRename={() => setRenaming(true)}
+            triggerRef={menuButtonRef}
             workflow={workflow}
           />
         </div>

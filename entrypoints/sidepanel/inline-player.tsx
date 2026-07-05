@@ -63,7 +63,7 @@ export function InlinePlayer({
             <IconButton
               label="Resume"
               onClick={() => {
-                sendMessage("resumeRun", undefined).then(onChanged);
+                sendMessage("resumeRun").then(onChanged);
               }}
             >
               <Play
@@ -74,7 +74,7 @@ export function InlinePlayer({
             <IconButton
               label="Skip step"
               onClick={() => {
-                sendMessage("skipStep", undefined).then(onChanged);
+                sendMessage("skipStep").then(onChanged);
               }}
             >
               <SkipForward aria-hidden="true" className="size-4 shrink-0" />

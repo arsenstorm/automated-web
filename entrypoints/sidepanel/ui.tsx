@@ -3,22 +3,32 @@
 import { cn } from "cnfast";
 import { TriangleAlert } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { type ReactNode, useEffect, useRef } from "react";
+import {
+  type ComponentPropsWithRef,
+  type ReactNode,
+  useEffect,
+  useRef,
+} from "react";
 import { useAnimDuration, useCrossfade, usePageCrossfade } from "./motion";
 
-export const INPUT =
-  "w-full rounded-md border border-input bg-transparent px-2.5 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-1";
+export const FOCUS_RING =
+  "focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2";
 
-export const PRIMARY_BUTTON =
-  "rounded-md bg-primary px-3 py-2 font-medium text-primary-foreground text-sm hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+/** Inset variant for inputs and menu items, where an outer ring would clip. */
+export const FOCUS_RING_INSET =
+  "focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-1";
+
+export const INPUT = `w-full rounded-md border border-input bg-transparent px-2.5 py-2 text-sm placeholder:text-muted-foreground ${FOCUS_RING_INSET}`;
+
+export const PRIMARY_BUTTON = `rounded-md bg-primary px-3 py-2 font-medium text-primary-foreground text-sm hover:bg-primary/90 ${FOCUS_RING}`;
 
 // Dark text in dark mode: the dark --destructive is a light red, and white
-// on it is only 2.9:1.
+// on it is only 2.9:1. The focus outline is destructive, not ring, so it
+// reads as part of the button.
 export const DESTRUCTIVE_BUTTON =
   "rounded-md bg-destructive px-3 py-2 font-medium text-sm text-white hover:bg-destructive/90 focus-visible:outline-2 focus-visible:outline-destructive focus-visible:outline-offset-2 dark:text-zinc-950";
 
-export const GHOST_TEXT_BUTTON =
-  "rounded-md px-3 py-1.5 font-medium text-muted-foreground text-sm hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2";
+export const GHOST_TEXT_BUTTON = `rounded-md px-3 py-1.5 font-medium text-muted-foreground text-sm hover:text-foreground ${FOCUS_RING}`;
 
 /** Centered card shell: icon tile, heading, description, step actions. */
 export function StepCard({
@@ -96,7 +106,10 @@ export function SmallButton({
 }) {
   return (
     <button
-      className="relative rounded-md bg-secondary px-2.5 py-1 font-medium text-secondary-foreground text-sm hover:bg-secondary/70 focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 disabled:opacity-50 disabled:hover:bg-secondary"
+      className={cn(
+        "relative rounded-md bg-secondary px-2.5 py-1 font-medium text-secondary-foreground text-sm hover:bg-secondary/70 disabled:opacity-50 disabled:hover:bg-secondary",
+        FOCUS_RING
+      )}
       disabled={disabled}
       onClick={onClick}
       type={type === "submit" ? "submit" : "button"}
@@ -117,42 +130,25 @@ const ICON_BUTTON_VARIANTS = {
 
 export function IconButton({
   label,
-  onClick,
   variant = "ghost",
-  disabled = false,
+  className,
   children,
-  onBlur,
-  onFocus,
-  onMouseEnter,
-  onMouseLeave,
-  expanded,
+  ...props
 }: {
+  /** Accessible name; the visible content is the icon alone. */
   label: string;
-  onClick: () => void;
   variant?: keyof typeof ICON_BUTTON_VARIANTS;
-  disabled?: boolean;
-  children: ReactNode;
-  onBlur?: () => void;
-  onFocus?: () => void;
-  onMouseEnter?: () => void;
-  onMouseLeave?: () => void;
-  /** For popover triggers: sets aria-expanded. */
-  expanded?: boolean;
-}) {
+} & ComponentPropsWithRef<"button">) {
   return (
     <button
-      aria-expanded={expanded}
       className={cn(
-        "relative rounded-md p-1.5 focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-2 disabled:pointer-events-none disabled:opacity-50",
-        ICON_BUTTON_VARIANTS[variant]
+        "relative rounded-md p-1.5 disabled:pointer-events-none disabled:opacity-50",
+        FOCUS_RING,
+        ICON_BUTTON_VARIANTS[variant],
+        className
       )}
-      disabled={disabled}
-      onBlur={onBlur}
-      onClick={onClick}
-      onFocus={onFocus}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
       type="button"
+      {...props}
     >
       {TOUCH_TARGET}
       <span className="sr-only">{label}</span>

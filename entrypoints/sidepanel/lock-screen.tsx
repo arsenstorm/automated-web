@@ -53,7 +53,7 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
   };
 
   const reset = () => {
-    sendMessage("resetVault", undefined).then(onUnlocked);
+    sendMessage("resetVault").then(onUnlocked);
   };
 
   const steps: Record<Step, ReactNode> = {
