@@ -30,7 +30,19 @@ export const stopRecording = async (): Promise<Workflow | null> => {
   }
   await setStored("recording", null);
   // Pull whatever the tab still has buffered before cutting the workflow.
-  await sendMessage("flushNow", undefined, recording.tabId).catch(() => null);
+  // Per frame: a tab-wide broadcast resolves on the first frame's response,
+  // which wouldn't guarantee iframe buffers landed.
+  const frames = (await browser.webNavigation
+    .getAllFrames({ tabId: recording.tabId })
+    .catch(() => null)) ?? [{ frameId: 0 }];
+  await Promise.all(
+    frames.map((frame) =>
+      sendMessage("flushNow", undefined, {
+        tabId: recording.tabId,
+        frameId: frame.frameId,
+      }).catch(() => null)
+    )
+  );
   const events = (await getSecure("events")).filter(
     (event) =>
       event.tabId === recording.tabId && event.ts >= recording.startedAt

@@ -21,6 +21,7 @@ vi.mock("@/lib/messaging", async (importOriginal) => ({
 const sendMessageMock = vi.mocked(sendMessage);
 
 const CLICK = { kind: "click", selector: "#go" } as const;
+const NAV = { kind: "navigate", url: "https://example.com/" } as const;
 const THREE_STEPS: Workflow = {
   id: "wf-1",
   name: "Test flow",
@@ -126,5 +127,152 @@ describe("replay orchestration", () => {
     const run = await getStored("run");
     expect(run?.status).toBe("paused");
     expect(run?.pausedReason).toContain("tab not reachable");
+  });
+
+  it("pauses on a pause step, and a plain resume advances past it", async () => {
+    await setSecure("workflows", [
+      {
+        ...THREE_STEPS,
+        steps: [NAV, CLICK, { kind: "pause" }, CLICK],
+      },
+    ]);
+    await setStored("run", pausedRun(await liveTabId(), 1));
+    await continueRun({ skip: false });
+    let run = await getStored("run");
+    expect(run?.status).toBe("paused");
+    expect(run?.pausedReason).toContain("pause");
+    await continueRun({ skip: false });
+    run = await getStored("run");
+    expect(run?.status).toBe("done");
+  });
+
+  it("completes a sleep step and moves on", async () => {
+    await setSecure("workflows", [
+      {
+        ...THREE_STEPS,
+        steps: [NAV, { kind: "sleep", ms: 1 }, CLICK],
+      },
+    ]);
+    await setStored("run", pausedRun(await liveTabId(), 1));
+    await continueRun({ skip: false });
+    expect((await getStored("run"))?.status).toBe("done");
+  });
+
+  it("captures extract output and substitutes it into a later input", async () => {
+    sendMessageMock.mockImplementation((_name, data) => {
+      const step = (data as { step: { kind: string } }).step;
+      return Promise.resolve(
+        step.kind === "extract" ? { ok: true, output: "$5" } : { ok: true }
+      ) as never;
+    });
+    await setSecure("workflows", [
+      {
+        ...THREE_STEPS,
+        steps: [
+          NAV,
+          { id: "s2", kind: "extract", selector: ".price" },
+          {
+            id: "s3",
+            kind: "input",
+            selector: "#note",
+            value: "was {{s2}}",
+            sensitive: false,
+          },
+        ],
+      },
+    ]);
+    await setStored("run", pausedRun(await liveTabId(), 1));
+    await continueRun({ skip: false });
+    const run = await getStored("run");
+    expect(run?.status).toBe("done");
+    expect(run?.outputs).toEqual({ s2: "$5" });
+    const inputCall = sendMessageMock.mock.calls.find(
+      ([, data]) =>
+        (data as { step?: { kind?: string } })?.step?.kind === "input"
+    );
+    expect((inputCall?.[1] as { step: { value: string } }).step.value).toBe(
+      "was $5"
+    );
+  });
+
+  it("dispatches frameless steps explicitly to the main frame", async () => {
+    const tabId = await liveTabId();
+    await setStored("run", pausedRun(tabId, 1));
+    await continueRun({ skip: false });
+    const call = sendMessageMock.mock.calls.find(
+      ([name]) => name === "executeStep"
+    );
+    expect(call?.[2]).toEqual({ tabId, frameId: 0 });
+  });
+
+  it("dispatches an iframe step to its matching frame", async () => {
+    const frameUrl = "https://widget.example.com/form";
+    // fake-browser doesn't model webNavigation; stub the frame listing.
+    Object.assign(fakeBrowser, {
+      webNavigation: {
+        getAllFrames: vi.fn().mockResolvedValue([
+          { frameId: 0, url: "https://example.com/" },
+          { frameId: 5, url: `${frameUrl}?token=zzz` },
+        ]),
+      },
+    });
+    await setSecure("workflows", [
+      {
+        ...THREE_STEPS,
+        steps: [NAV, { ...CLICK, frameUrl }],
+      },
+    ]);
+    const tabId = await liveTabId();
+    await setStored("run", pausedRun(tabId, 1));
+    await continueRun({ skip: false });
+    expect((await getStored("run"))?.status).toBe("done");
+    const call = sendMessageMock.mock.calls.find(
+      ([name]) => name === "executeStep"
+    );
+    expect(call?.[2]).toEqual({ tabId, frameId: 5 });
+  });
+
+  it("pauses when the step's frame is gone", async () => {
+    Object.assign(fakeBrowser, {
+      webNavigation: {
+        getAllFrames: vi
+          .fn()
+          .mockResolvedValue([{ frameId: 0, url: "https://example.com/" }]),
+      },
+    });
+    await setSecure("workflows", [
+      {
+        ...THREE_STEPS,
+        steps: [NAV, { ...CLICK, frameUrl: "https://gone.example.com/x" }],
+      },
+    ]);
+    await setStored("run", pausedRun(await liveTabId(), 1));
+    await continueRun({ skip: false });
+    const run = await getStored("run");
+    expect(run?.status).toBe("paused");
+    expect(run?.pausedReason).toContain("frame not found");
+  });
+
+  it("pauses with missing-output when a token has no value yet", async () => {
+    await setSecure("workflows", [
+      {
+        ...THREE_STEPS,
+        steps: [
+          NAV,
+          {
+            id: "s2",
+            kind: "input",
+            selector: "#note",
+            value: "{{s9}}",
+            sensitive: false,
+          },
+        ],
+      },
+    ]);
+    await setStored("run", pausedRun(await liveTabId(), 1));
+    await continueRun({ skip: false });
+    const run = await getStored("run");
+    expect(run?.status).toBe("paused");
+    expect(run?.pausedReason).toContain("missing-output");
   });
 });

@@ -14,6 +14,7 @@ export default defineConfig({
       "storage", // workflows/events/patterns (encrypted) + settings
       "notifications", // "workflow stuck / finished" alerts
       "sidePanel", // the UI lives in the side panel
+      "webNavigation", // maps recorded frame URLs to live frameIds at replay
     ],
     // Passive capture works wherever the user browses, so the content script
     // runs everywhere. Host access also grants tab.url reads, which is why

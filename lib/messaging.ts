@@ -48,6 +48,8 @@ export interface ProtocolMap {
   // background → content (tab-targeted)
   suggestWorkflow(data: { fingerprint: string; stepCount: number }): void;
   unlockVault(password: string): boolean;
+  /** Replace a workflow's steps (timeline editor). Throws when invalid. */
+  updateWorkflowSteps(data: { id: string; steps: StepAction[] }): void;
   vaultStatus(): VaultStatus;
 }
 

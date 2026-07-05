@@ -1,10 +1,26 @@
 /** Shared data model + storage keys. Everything lives in `browser.storage.local`. */
 
-export type StepAction =
+/**
+ * `id` is a stable short handle ("s1", "s2", …) backfilled by the timeline
+ * editor; `{{sN}}` tokens in input values / navigate URLs reference the
+ * output of the step with that id. Recorded-but-never-edited steps have none.
+ */
+export type StepAction = {
+  id?: string;
+  /**
+   * Element lives in an iframe: that frame's URL at record time. Stamped by
+   * the background from the message sender; not user-editable.
+   */
+  frameUrl?: string;
+} & (
   | { kind: "navigate"; url: string }
   | { kind: "click"; selector: string; text?: string }
   | { kind: "input"; selector: string; value: string; sensitive: boolean }
-  | { kind: "submit"; selector: string };
+  | { kind: "submit"; selector: string }
+  | { kind: "sleep"; ms: number }
+  | { kind: "pause" }
+  | { kind: "extract"; selector: string }
+);
 
 export interface RecordedEvent {
   action: StepAction;
@@ -35,6 +51,12 @@ export type RunStatus = "running" | "paused" | "done" | "failed";
 
 export interface RunState {
   id: string;
+  /**
+   * Step outputs keyed by step id, for `{{sN}}` substitution. ponytail:
+   * lives unencrypted in the transient run record; encrypt if outputs ever
+   * hold secrets.
+   */
+  outputs?: Record<string, string>;
   pausedReason?: string;
   status: RunStatus;
   /** Next step to execute. */
@@ -44,10 +66,10 @@ export interface RunState {
 }
 
 export type StepResult =
-  | { ok: true }
+  | { ok: true; output?: string }
   | {
       ok: false;
-      reason: "timeout" | "captcha" | "secret";
+      reason: "timeout" | "captcha" | "secret" | "pause" | "missing-output";
       detail?: string;
     };
 

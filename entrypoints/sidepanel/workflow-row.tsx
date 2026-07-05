@@ -1,10 +1,11 @@
 /** A workflow row: name, play/stop/replay control, options menu, inline player. */
 
-import { Play, RotateCcw, Square } from "lucide-react";
+import { Play, RotateCcw, SkipForward, Square } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { IconButton } from "@/components/buttons";
 import { Expand, IconSwap } from "@/components/transitions";
 import { fireAndForget, sendMessage } from "@/lib/messaging";
+import { isPauseBlock } from "@/lib/replay-state";
 import type { RunState, Workflow } from "@/lib/types";
 import { InlinePlayer } from "./inline-player";
 import { RenameForm } from "./rename-form";
@@ -18,18 +19,21 @@ export function WorkflowRow({
   run,
   namingId,
   onChanged,
+  onEdit,
 }: {
   workflow: Workflow;
   run: RunState | null;
   /** Freshly recorded workflow whose row should open in naming mode. */
   namingId: string | null;
   onChanged: () => void;
+  onEdit: () => void;
 }) {
   const [renaming, setRenaming] = useState(workflow.id === namingId);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const active = run?.workflowId === workflow.id;
   const done = active && run?.status === "done";
   const runBusy = run !== null && run.status !== "done";
+  const currentStep = active && run ? workflow.steps[run.stepIndex] : undefined;
 
   useEffect(() => {
     if (!done) {
@@ -43,6 +47,15 @@ export function WorkflowRow({
 
   const play = () => {
     fireAndForget(sendMessage("startRun", workflow.id), onChanged);
+  };
+
+  /** The background rejects edits while this workflow runs — stop it first. */
+  const edit = () => {
+    if (active && !done) {
+      fireAndForget(sendMessage("cancelRun"), onEdit);
+      return;
+    }
+    onEdit();
   };
 
   /** The row's single play/stop/replay control, keyed for icon crossfades. */
@@ -108,6 +121,32 @@ export function WorkflowRow({
           )}
         </div>
         <div className="flex shrink-0 gap-1">
+          {active && run?.status === "paused" && (
+            <>
+              <IconButton
+                label="Resume"
+                onClick={() => {
+                  fireAndForget(sendMessage("resumeRun"), onChanged);
+                }}
+              >
+                <Play
+                  aria-hidden="true"
+                  className="size-4 shrink-0 fill-current"
+                />
+              </IconButton>
+              {/* A pause block resumes past itself, so skip adds nothing. */}
+              {!isPauseBlock(run) && (
+                <IconButton
+                  label="Skip step"
+                  onClick={() => {
+                    fireAndForget(sendMessage("skipStep"), onChanged);
+                  }}
+                >
+                  <SkipForward aria-hidden="true" className="size-4 shrink-0" />
+                </IconButton>
+              )}
+            </>
+          )}
           <IconButton
             disabled={control.disabled}
             label={control.label}
@@ -117,6 +156,7 @@ export function WorkflowRow({
           </IconButton>
           <RowMenu
             onChanged={onChanged}
+            onEdit={edit}
             onRename={() => setRenaming(true)}
             triggerRef={menuButtonRef}
             workflow={workflow}
@@ -126,8 +166,12 @@ export function WorkflowRow({
       <Expand show={active && run !== null}>
         {run && (
           <InlinePlayer
-            onChanged={onChanged}
             run={run}
+            sleepMs={
+              currentStep?.kind === "sleep" && run.status === "running"
+                ? currentStep.ms
+                : undefined
+            }
             total={workflow.steps.length}
           />
         )}

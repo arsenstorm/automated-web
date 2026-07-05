@@ -9,7 +9,9 @@ import {
   startedRun,
 } from "@/lib/replay-state";
 import { getStored, setStored } from "@/lib/storage";
+import { resolveStep } from "@/lib/templates";
 import type { RunState, StepResult, Workflow } from "@/lib/types";
+import { MAX_SLEEP_MS } from "@/lib/workflow";
 import { getSecure, vaultLocked } from "./vault";
 
 const TAB_LOAD_TIMEOUT_MS = 30_000;
@@ -48,7 +50,9 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const pingContent = async (tabId: number): Promise<boolean> => {
   for (let attempt = 0; attempt < PING_RETRIES; attempt++) {
     try {
-      await sendMessage("ping", undefined, tabId);
+      // The content script runs in every frame; pin the main frame so the
+      // promise doesn't resolve off whichever frame answers first.
+      await sendMessage("ping", undefined, { tabId, frameId: 0 });
       return true;
     } catch {
       await sleep(PING_RETRY_MS);
@@ -69,55 +73,17 @@ const navigateStep = async (
   return { ok: true };
 };
 
-const executeOneStep = async (
-  run: RunState,
-  workflow: Workflow
-): Promise<StepResult | "vault-locked"> => {
-  const step = workflow.steps[run.stepIndex];
-  if (!step) {
-    return { ok: true };
-  }
-  if (step.kind === "navigate") {
-    return await navigateStep(run.tabId, step.url);
-  }
-  // Values are inline in the step, but honour a mid-run lock: locked means
-  // dormant, so don't keep typing secrets into pages.
-  if (step.kind === "input" && (await vaultLocked())) {
-    return "vault-locked";
-  }
-  return await sendMessage("executeStep", { step }, run.tabId).catch(
-    (): StepResult => ({
-      ok: false,
-      reason: "timeout",
-      detail: "tab not reachable",
-    })
-  );
-};
-
-const runLoop = async () => {
-  let run = await getStored("run");
-  if (run?.status !== "running") {
-    return;
-  }
-  const workflows = await getSecure("workflows");
-  const workflow = workflows.find((w) => w.id === run?.workflowId);
-  if (!workflow) {
-    await setStored("run", null);
-    return;
-  }
-  while (run.status === "running") {
-    const result = await executeOneStep(run, workflow);
-    run =
-      result === "vault-locked"
-        ? pausedRun(run, "vault locked — unlock it in the side panel")
-        : afterStep(run, result, workflow.steps.length);
-    await setStored("run", run);
-  }
-  if (run.status === "paused") {
-    await notifyStuck(run.pausedReason ?? "unknown");
-  }
-  if (run.status === "done") {
-    await notify("Workflow finished", workflow.name);
+/** Sleep in chunks, touching storage each chunk to reset the MV3 idle timer. */
+// ponytail: chunked keepalive, capped at 5 min; browser.alarms if longer
+// sleeps become real.
+const KEEPALIVE_CHUNK_MS = 20_000;
+const keepAliveSleep = async (ms: number) => {
+  let remaining = Math.min(Math.max(ms, 0), MAX_SLEEP_MS);
+  while (remaining > 0) {
+    const chunk = Math.min(remaining, KEEPALIVE_CHUNK_MS);
+    await sleep(chunk);
+    remaining -= chunk;
+    await browser.storage.local.get("run");
   }
 };
 
@@ -139,6 +105,136 @@ const sameUrl = (a: string | undefined, b: string): boolean => {
     return urlA.href === urlB.href;
   } catch {
     return false;
+  }
+};
+
+const samePathname = (a: string | undefined, b: string): boolean => {
+  try {
+    if (a === undefined) {
+      return false;
+    }
+    const urlA = new URL(a);
+    const urlB = new URL(b);
+    return (
+      urlA.origin === urlB.origin &&
+      urlA.pathname.replace(TRAILING_SLASH, "") ===
+        urlB.pathname.replace(TRAILING_SLASH, "")
+    );
+  } catch {
+    return false;
+  }
+};
+
+/** The live frameId for a step, or null when its frame is gone. */
+const frameForStep = async (
+  tabId: number,
+  frameUrl: string | undefined
+): Promise<number | null> => {
+  if (!frameUrl) {
+    // Main frame — explicit, so the per-frame listeners never race.
+    return 0;
+  }
+  const frames =
+    (await browser.webNavigation.getAllFrames({ tabId }).catch(() => null)) ??
+    [];
+  const match =
+    frames.find((frame) => sameUrl(frame.url, frameUrl)) ??
+    // ponytail: widget iframes churn query strings; origin+pathname
+    // fallback, first match wins ties.
+    frames.find((frame) => samePathname(frame.url, frameUrl));
+  return match?.frameId ?? null;
+};
+
+const executeOneStep = async (
+  run: RunState,
+  workflow: Workflow
+): Promise<StepResult | "vault-locked"> => {
+  const rawStep = workflow.steps[run.stepIndex];
+  if (!rawStep) {
+    return { ok: true };
+  }
+  const resolved = resolveStep(rawStep, run.outputs ?? {});
+  if ("missing" in resolved) {
+    return {
+      ok: false,
+      reason: "missing-output",
+      detail: `no output for ${resolved.missing.map((id) => `{{${id}}}`).join(", ")}`,
+    };
+  }
+  const step = resolved.step;
+  if (step.kind === "sleep") {
+    await keepAliveSleep(step.ms);
+    return { ok: true };
+  }
+  if (step.kind === "pause") {
+    return {
+      ok: false,
+      reason: "pause",
+      detail: "waiting for you — resume to continue",
+    };
+  }
+  if (step.kind === "navigate") {
+    return await navigateStep(run.tabId, step.url);
+  }
+  // Values are inline in the step, but honour a mid-run lock: locked means
+  // dormant, so don't keep typing secrets into pages.
+  if (step.kind === "input" && (await vaultLocked())) {
+    return "vault-locked";
+  }
+  const frameId = await frameForStep(run.tabId, step.frameUrl);
+  if (frameId === null) {
+    return {
+      ok: false,
+      reason: "timeout",
+      detail: `frame not found: ${step.frameUrl}`,
+    };
+  }
+  return await sendMessage(
+    "executeStep",
+    { step },
+    { tabId: run.tabId, frameId }
+  ).catch(
+    (): StepResult => ({
+      ok: false,
+      reason: "timeout",
+      detail: "tab not reachable",
+    })
+  );
+};
+
+const runLoop = async () => {
+  let run = await getStored("run");
+  if (run?.status !== "running") {
+    return;
+  }
+  const workflows = await getSecure("workflows");
+  const workflow = workflows.find((w) => w.id === run?.workflowId);
+  if (!workflow) {
+    await setStored("run", null);
+    return;
+  }
+  while (run.status === "running") {
+    const result = await executeOneStep(run, workflow);
+    const stepId: string | undefined = workflow.steps[run.stepIndex]?.id;
+    if (
+      stepId &&
+      result !== "vault-locked" &&
+      result.ok &&
+      result.output !== undefined
+    ) {
+      run = { ...run, outputs: { ...run.outputs, [stepId]: result.output } };
+    }
+    run =
+      result === "vault-locked"
+        ? pausedRun(run, "vault locked — unlock it in the side panel")
+        : afterStep(run, result, workflow.steps.length);
+    await setStored("run", run);
+  }
+  if (run.status === "paused") {
+    await notifyStuck(run.pausedReason ?? "unknown");
+  }
+  if (run.status === "done") {
+    await notify("Workflow finished", workflow.name);
   }
 };
 
@@ -197,7 +293,9 @@ export const continueRun = async ({ skip }: { skip: boolean }) => {
     await setStored("run", null);
     return;
   }
-  const next = skip
+  // Resuming a pause step advances past it — re-running would pause forever.
+  const advance = skip || workflow.steps[run.stepIndex]?.kind === "pause";
+  const next = advance
     ? afterStep(resumedRun(run), { ok: true }, workflow.steps.length)
     : resumedRun(run);
   await setStored("run", next);

@@ -16,12 +16,15 @@ import { Onboarding } from "./onboarding";
 import { RecordButton } from "./record-button";
 import { RecordingCard } from "./recording-card";
 import { SettingsView } from "./settings";
+import { TimelineView } from "./timeline";
 import { WorkflowList } from "./workflow-list";
 
 const RUN_POLL_MS = 1000;
 
 function App() {
-  const [view, setView] = useState<"main" | "settings">("main");
+  const [view, setView] = useState<"main" | "settings" | { edit: string }>(
+    "main"
+  );
   const [vaultStatus, setVaultStatus] = useState<VaultStatus | null>(null);
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
@@ -141,6 +144,7 @@ function App() {
           <WorkflowList
             namingId={namingId}
             onChanged={refresh}
+            onEdit={(id) => setView({ edit: id })}
             run={run}
             workflows={workflows}
           />
@@ -150,7 +154,7 @@ function App() {
   );
 
   let page = mainView;
-  let pageKey = view as string;
+  let pageKey = typeof view === "string" ? view : "timeline";
   if (vaultStatus === "locked") {
     page = <LockScreen onUnlocked={refresh} />;
     pageKey = "locked";
@@ -172,6 +176,20 @@ function App() {
         status={vaultStatus}
       />
     );
+  } else if (typeof view === "object") {
+    const editing = workflows.find((workflow) => workflow.id === view.edit);
+    if (editing) {
+      page = (
+        <TimelineView
+          onBack={() => setView("main")}
+          onChanged={refresh}
+          workflow={editing}
+        />
+      );
+    } else {
+      // Deleted (or not yet loaded) — fall back to the list.
+      pageKey = "main";
+    }
   }
 
   return (

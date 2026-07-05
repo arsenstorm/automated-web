@@ -72,3 +72,29 @@ export function suggestName(actions: StepAction[], host: string): string {
   }
   return `Workflow on ${host}`;
 }
+
+const MS_PER_SECOND = 1000;
+
+/** One-line human label for a step, for the timeline editor. */
+export function describeStep(step: StepAction): string {
+  switch (step.kind) {
+    case "navigate":
+      return `Open ${hostOfUrl(step.url) ?? step.url}`;
+    case "click":
+      return `Click ${step.text ?? step.selector}`;
+    case "input":
+      return step.sensitive
+        ? `Type a secret into ${step.selector}`
+        : `Type into ${step.selector}`;
+    case "submit":
+      return `Submit ${step.selector}`;
+    case "sleep":
+      return `Wait ${step.ms / MS_PER_SECOND}s`;
+    case "pause":
+      return "Pause for me";
+    case "extract":
+      return `Extract text from ${step.selector}`;
+    default:
+      return "Step";
+  }
+}

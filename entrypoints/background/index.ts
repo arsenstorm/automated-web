@@ -1,6 +1,8 @@
 import { fireAndForget, onMessage } from "@/lib/messaging";
+import { stampEvents } from "@/lib/miner";
 import { getStored, setStored } from "@/lib/storage";
 import { EVENT_BUFFER_CAP } from "@/lib/types";
+import { validateSteps } from "@/lib/workflow";
 import { dismissSuggestion, runMiner, saveSuggestion } from "./mining";
 import { startRecording, stopRecording } from "./recording";
 import { continueRun, pauseInterruptedRun, startRun } from "./replay";
@@ -41,8 +43,14 @@ export default defineBackground(() => {
       return;
     }
     const events = await getSecure("events");
-    const tabId = sender.tab?.id;
-    events.push(...data.map((event) => ({ ...event, tabId })));
+    events.push(
+      ...stampEvents(data, {
+        tabId: sender.tab?.id,
+        frameId: sender.frameId,
+        frameUrl: sender.url,
+        tabUrl: sender.tab?.url,
+      })
+    );
     await setSecure("events", events.slice(-EVENT_BUFFER_CAP));
   });
   onMessage("startRecording", () => startRecording());
@@ -64,6 +72,23 @@ export default defineBackground(() => {
     if (run?.workflowId === data) {
       await setStored("run", null);
     }
+  });
+  onMessage("updateWorkflowSteps", async ({ data }) => {
+    const run = await getStored("run");
+    if (run?.workflowId === data.id && run.status !== "done") {
+      throw new Error("Stop the active run before editing");
+    }
+    const error = validateSteps(data.steps);
+    if (error) {
+      throw new Error(error);
+    }
+    const workflows = await getSecure("workflows");
+    await setSecure(
+      "workflows",
+      workflows.map((workflow) =>
+        workflow.id === data.id ? { ...workflow, steps: data.steps } : workflow
+      )
+    );
   });
   onMessage("renameWorkflow", async ({ data }) => {
     const workflows = await getSecure("workflows");

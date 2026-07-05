@@ -1,30 +1,24 @@
 /** Small text and icon button primitives. */
 
 import { cn } from "cnfast";
-import type { ComponentPropsWithRef, ReactNode } from "react";
+import type { ComponentPropsWithRef } from "react";
 import { FOCUS_RING } from "./styles";
 import { TOUCH_TARGET } from "./touch-target";
 
 export function SmallButton({
+  className,
   children,
-  onClick,
-  disabled = false,
-  type = "button",
-}: {
-  children: ReactNode;
-  onClick?: () => void;
-  disabled?: boolean;
-  type?: "button" | "submit";
-}) {
+  ...props
+}: ComponentPropsWithRef<"button">) {
   return (
     <button
       className={cn(
         "relative rounded-md bg-secondary px-2.5 py-1 font-medium text-secondary-foreground text-sm hover:bg-secondary/70 disabled:opacity-50 disabled:hover:bg-secondary",
-        FOCUS_RING
+        FOCUS_RING,
+        className
       )}
-      disabled={disabled}
-      onClick={onClick}
-      type={type === "submit" ? "submit" : "button"}
+      type="button"
+      {...props}
     >
       {TOUCH_TARGET}
       {children}

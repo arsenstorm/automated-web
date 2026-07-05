@@ -1,36 +1,32 @@
 /** Replay step executor: waits for elements and applies recorded actions. */
 
 import { hasCaptcha } from "@/lib/replay-state";
-import { findByText, lastTag, trimmedText } from "@/lib/selector";
+import { deepQuery, findByText, lastTag, trimmedText } from "@/lib/selector";
 import type { StepAction, StepResult } from "@/lib/types";
 import { suppressRecording } from "./recorder";
 
 const ELEMENT_TIMEOUT_MS = 10_000;
+const POLL_INTERVAL_MS = 200;
 const REPLAY_SUPPRESS_MS = 2000;
 
-const waitForElement = (selector: string): Promise<Element | null> =>
-  new Promise((resolve) => {
-    const found = document.querySelector(selector);
-    if (found) {
-      resolve(found);
-      return;
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Polling instead of a MutationObserver: an observer on the document can't
+// see mutations inside shadow roots, and deepQuery has to re-walk the chain
+// anyway.
+const waitForElement = async (selector: string): Promise<Element | null> => {
+  const deadline = Date.now() + ELEMENT_TIMEOUT_MS;
+  for (;;) {
+    const el = deepQuery(document, selector);
+    if (el) {
+      return el;
     }
-    const observer = new MutationObserver(() => {
-      const el = document.querySelector(selector);
-      if (el) {
-        observer.disconnect();
-        resolve(el);
-      }
-    });
-    observer.observe(document.documentElement, {
-      childList: true,
-      subtree: true,
-    });
-    setTimeout(() => {
-      observer.disconnect();
-      resolve(null);
-    }, ELEMENT_TIMEOUT_MS);
-  });
+    if (Date.now() >= deadline) {
+      return null;
+    }
+    await sleep(POLL_INTERVAL_MS);
+  }
+};
 
 /** Native value setter so React-controlled inputs pick up the change. */
 const setNativeValue = (el: Element, value: string) => {
@@ -62,7 +58,12 @@ const applyStep = (el: Element, step: StepAction) => {
 };
 
 export const executeStep = async (step: StepAction): Promise<StepResult> => {
-  if (step.kind === "navigate") {
+  // navigate/sleep/pause are handled by the background and never sent here.
+  if (
+    step.kind === "navigate" ||
+    step.kind === "sleep" ||
+    step.kind === "pause"
+  ) {
     return { ok: true };
   }
   if (hasCaptcha(document)) {
@@ -81,6 +82,13 @@ export const executeStep = async (step: StepAction): Promise<StepResult> => {
   }
   if (!el) {
     return { ok: false, reason: "timeout", detail: step.selector };
+  }
+  if (step.kind === "extract") {
+    const output =
+      el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement
+        ? el.value
+        : (trimmedText(el) ?? el.textContent?.trim() ?? "");
+    return { ok: true, output };
   }
   // A secret with no stored value (the default — storing them is opt-in):
   // focus the field and pause for the user to type it, then skip the step.

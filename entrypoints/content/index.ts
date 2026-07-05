@@ -16,7 +16,11 @@ const FLUSH_INTERVAL_MS = 5000;
 
 export default defineContentScript({
   matches: ["<all_urls>"],
+  // Record and replay inside iframes too.
+  allFrames: true,
+  matchAboutBlank: true,
   main() {
+    const isTop = window.self === window.top;
     const syncRecordSecrets = () => {
       getStored("settings")
         .then((settings) => setRecordSecrets(Boolean(settings.recordSecrets)))
@@ -29,15 +33,19 @@ export default defineContentScript({
       }
     });
 
-    record({ kind: "navigate", url: location.href });
-    // Back/forward can restore from bfcache or move SPA history without
-    // re-running main(); record those navigations too.
-    window.addEventListener("pageshow", (event) => {
-      if (event.persisted) {
-        recordNavigate();
-      }
-    });
-    window.addEventListener("popstate", recordNavigate);
+    // Only the top frame narrates navigation — subframe navigate events
+    // would split miner sessions on iframe origins.
+    if (isTop) {
+      record({ kind: "navigate", url: location.href });
+      // Back/forward can restore from bfcache or move SPA history without
+      // re-running main(); record those navigations too.
+      window.addEventListener("pageshow", (event) => {
+        if (event.persisted) {
+          recordNavigate();
+        }
+      });
+      window.addEventListener("popstate", recordNavigate);
+    }
 
     document.addEventListener("click", onClick, true);
     document.addEventListener("change", onChange, true);
@@ -48,9 +56,12 @@ export default defineContentScript({
     onMessage("ping", () => {
       // Presence check used by the replayer after navigations.
     });
-    onMessage("suggestWorkflow", ({ data }) => {
-      showToast(data.fingerprint, data.stepCount);
-    });
+    if (isTop) {
+      // The miner broadcasts to the tab; only the top frame shows the toast.
+      onMessage("suggestWorkflow", ({ data }) => {
+        showToast(data.fingerprint, data.stepCount);
+      });
+    }
     onMessage("executeStep", ({ data }) => executeStep(data.step));
     onMessage("flushNow", () => flush());
   },

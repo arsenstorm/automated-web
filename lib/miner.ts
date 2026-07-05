@@ -33,6 +33,44 @@ const navPathname = (action: StepAction): string | null =>
   action.kind === "navigate" ? pathnameOf(action.url) : null;
 
 /**
+ * Stamp a flushed event batch with its sender's identity — the trust
+ * boundary: every value here derives from the browser's MessageSender, which
+ * pages cannot forge. Subframe batches additionally get the frame's URL on
+ * each action (replay needs it to find the frame again), the tab's origin
+ * instead of the iframe's (so sessions group under the page the user sees),
+ * and their navigate events dropped (only the top frame narrates navigation).
+ */
+export function stampEvents(
+  events: RecordedEvent[],
+  sender: {
+    tabId?: number;
+    frameId?: number;
+    frameUrl?: string;
+    tabUrl?: string;
+  }
+): RecordedEvent[] {
+  const { tabId, frameId, frameUrl, tabUrl } = sender;
+  if (!(frameId && frameUrl)) {
+    return events.map((event) => ({ ...event, tabId }));
+  }
+  const tabOrigin = (() => {
+    try {
+      return tabUrl ? new URL(tabUrl).origin : undefined;
+    } catch {
+      return;
+    }
+  })();
+  return events
+    .filter((event) => event.action.kind !== "navigate")
+    .map((event) => ({
+      ...event,
+      tabId,
+      origin: tabOrigin ?? event.origin,
+      action: { ...event.action, frameUrl },
+    }));
+}
+
+/**
  * Split events into per-origin sessions. A session ends on an origin change,
  * a >60s idle gap, or a navigation back to the pathname the session started
  * on (the user restarting the same flow back-to-back).
@@ -79,7 +117,12 @@ const actionShape = (action: StepAction): string => {
   if (action.kind === "navigate") {
     return `navigate:${pathnameOf(action.url)}`;
   }
-  return `${action.kind}:${action.selector}`;
+  // Editor-only kinds (sleep/pause) never appear in recorded streams.
+  // frameUrl stays out on purpose: widget iframe URLs carry volatile query
+  // strings that would keep repeated sessions from ever matching.
+  return "selector" in action
+    ? `${action.kind}:${action.selector}`
+    : action.kind;
 };
 
 const djb2 = (input: string): string => {

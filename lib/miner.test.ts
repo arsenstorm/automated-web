@@ -6,6 +6,7 @@ import {
   SESSION_GAP_MS,
   SUGGEST_COOLDOWN_MS,
   sessionize,
+  stampEvents,
   toWorkflowSteps,
 } from "./miner";
 import type { CandidatePattern, RecordedEvent, StepAction } from "./types";
@@ -49,6 +50,44 @@ const patternFor = (
   steps: session.map((event) => event.action),
   lastSeen: session.at(-1)?.ts ?? 0,
   ...overrides,
+});
+
+describe("stampEvents", () => {
+  const FRAME_URL = "https://widget.example.com/form?token=abc";
+  const batch = (): RecordedEvent[] => [
+    {
+      ts: 0,
+      origin: "https://widget.example.com",
+      action: { kind: "navigate", url: FRAME_URL },
+    },
+    {
+      ts: 1000,
+      origin: "https://widget.example.com",
+      action: { kind: "click", selector: "#go" },
+    },
+  ];
+
+  it("stamps top-frame batches with the tabId only", () => {
+    const stamped = stampEvents(batch(), { tabId: 7, frameId: 0 });
+    expect(stamped).toHaveLength(2);
+    expect(stamped[0]?.tabId).toBe(7);
+    expect(stamped[0]?.origin).toBe("https://widget.example.com");
+    expect(stamped[1]?.action).not.toHaveProperty("frameUrl");
+  });
+
+  it("marks subframe actions with the frame URL and the tab's origin", () => {
+    const stamped = stampEvents(batch(), {
+      tabId: 7,
+      frameId: 42,
+      frameUrl: FRAME_URL,
+      tabUrl: `${ORIGIN}/checkout`,
+    });
+    // The subframe's navigate event is dropped: only the top frame narrates.
+    expect(stamped.map((event) => event.action.kind)).toEqual(["click"]);
+    expect(stamped[0]?.tabId).toBe(7);
+    expect(stamped[0]?.origin).toBe(ORIGIN);
+    expect(stamped[0]?.action.frameUrl).toBe(FRAME_URL);
+  });
 });
 
 describe("sessionize", () => {

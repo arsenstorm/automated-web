@@ -1,11 +1,9 @@
-/** Run progress inside a workflow row: bar, status, transport controls. */
+/** Run progress inside a workflow row: bar, status text, badge. */
 
 import { cn } from "cnfast";
-import { Play, SkipForward } from "lucide-react";
 import { motion } from "motion/react";
 import { Badge, type BadgeTone } from "@/components/badge";
-import { IconButton } from "@/components/buttons";
-import { fireAndForget, sendMessage } from "@/lib/messaging";
+import { isPauseBlock } from "@/lib/replay-state";
 import type { RunState, RunStatus } from "@/lib/types";
 import { useReducedMotion } from "./motion";
 
@@ -17,23 +15,35 @@ const RUN_TONES: Record<RunStatus, BadgeTone> = {
 };
 
 const FULL_WIDTH = 100;
+const MS_PER_SECOND = 1000;
 
 export function InlinePlayer({
   run,
   total,
-  onChanged,
+  sleepMs,
 }: {
   run: RunState;
   total: number;
-  onChanged: () => void;
+  /** Set while the run sits on a sleep step: tween the bar over it. */
+  sleepMs?: number;
 }) {
   const reducedMotion = useReducedMotion();
-  // Step 0 is the initial navigate — the page the run starts on, not work.
-  // Number and measure progress against the real steps only.
+  const showReason = run.pausedReason !== undefined && !isPauseBlock(run);
   const steps = Math.max(total - 1, 1);
   const completed =
     run.status === "done" ? steps : Math.max(run.stepIndex - 1, 0);
-  const percent = (completed / steps) * FULL_WIDTH;
+
+  const percentOf = (count: number) => `${(count / steps) * FULL_WIDTH}%`;
+  const sleeping = sleepMs !== undefined && !reducedMotion;
+  const width = sleeping
+    ? [percentOf(completed), percentOf(Math.min(completed + 1, steps))]
+    : percentOf(completed);
+  let transition: { duration: number; ease?: "linear" } | undefined;
+  if (reducedMotion) {
+    transition = { duration: 0 };
+  } else if (sleeping) {
+    transition = { duration: sleepMs / MS_PER_SECOND, ease: "linear" };
+  }
 
   return (
     <div className="pt-2">
@@ -42,49 +52,24 @@ export function InlinePlayer({
         className="h-1 overflow-hidden rounded-full bg-secondary"
       >
         <motion.div
-          animate={{ width: `${percent}%` }}
+          animate={{ width }}
           className={cn(
             "h-full",
             run.status === "failed" ? "bg-destructive" : "bg-primary"
           )}
           initial={false}
-          transition={reducedMotion ? { duration: 0 } : undefined}
+          transition={transition}
         />
       </div>
-      <div className="mt-1.5 flex items-center gap-2">
-        <div
-          aria-live="polite"
-          className="flex min-w-0 flex-1 items-center justify-between gap-2"
-        >
-          <p className="min-w-0 truncate text-muted-foreground text-sm tabular-nums">
-            Step {Math.min(Math.max(run.stepIndex, 1), steps)} of {steps}
-            {run.pausedReason ? ` — ${run.pausedReason}` : ""}
-          </p>
-          <Badge tone={RUN_TONES[run.status]}>{run.status}</Badge>
-        </div>
-        {run.status === "paused" && (
-          <div className="flex shrink-0 gap-1">
-            <IconButton
-              label="Resume"
-              onClick={() => {
-                fireAndForget(sendMessage("resumeRun"), onChanged);
-              }}
-            >
-              <Play
-                aria-hidden="true"
-                className="size-4 shrink-0 fill-current"
-              />
-            </IconButton>
-            <IconButton
-              label="Skip step"
-              onClick={() => {
-                fireAndForget(sendMessage("skipStep"), onChanged);
-              }}
-            >
-              <SkipForward aria-hidden="true" className="size-4 shrink-0" />
-            </IconButton>
-          </div>
-        )}
+      <div
+        aria-live="polite"
+        className="mt-1.5 flex items-center justify-between gap-2"
+      >
+        <p className="min-w-0 truncate text-muted-foreground text-sm tabular-nums">
+          Step {Math.min(Math.max(run.stepIndex, 1), steps)} of {steps}
+          {showReason ? ` — ${run.pausedReason}` : ""}
+        </p>
+        <Badge tone={RUN_TONES[run.status]}>{run.status}</Badge>
       </div>
     </div>
   );

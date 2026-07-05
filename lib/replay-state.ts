@@ -44,6 +44,14 @@ export function resumedRun(run: RunState): RunState {
   return { ...run, status: "running", pausedReason: undefined };
 }
 
+/**
+ * True when a paused run sits on a deliberate pause step rather than an
+ * error. "pause" is the only paused reason with that prefix.
+ */
+export function isPauseBlock(run: RunState): boolean {
+  return run.pausedReason?.startsWith("pause") ?? false;
+}
+
 const CAPTCHA_IFRAME = /recaptcha|hcaptcha|turnstile/i;
 const CAPTCHA_CONTAINERS = ".g-recaptcha, .h-captcha, .cf-turnstile";
 

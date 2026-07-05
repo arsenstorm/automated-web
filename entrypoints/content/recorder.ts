@@ -25,6 +25,16 @@ export const suppressRecording = (ms: number) => {
 
 const recordingSuppressed = () => Date.now() < suppressUntil;
 
+/**
+ * The real event target: `event.target` is retargeted to the shadow host for
+ * events from inside shadow roots; composedPath()[0] is the inner element.
+ * Both fall back gracefully for synthetic events without composedPath.
+ */
+const eventTarget = (event: Event): EventTarget | null => {
+  const first = event.composedPath?.()[0];
+  return first instanceof Element ? first : event.target;
+};
+
 export const record = (action: StepAction) => {
   buffer.push({ ts: Date.now(), origin: location.origin, action });
 };
@@ -48,7 +58,7 @@ export const flush = (): Promise<void> => {
 };
 
 export const onClick = (event: MouseEvent) => {
-  const target = event.target;
+  const target = eventTarget(event);
   if (
     recordingSuppressed() ||
     !(target instanceof Element) ||
@@ -56,8 +66,14 @@ export const onClick = (event: MouseEvent) => {
   ) {
     return;
   }
-  const actionable = target.closest(ACTIONABLE);
-  if (!actionable) {
+  // composedPath walks actionable ancestors across shadow boundaries too;
+  // on plain pages it visits exactly what closest() would.
+  const actionable =
+    event
+      .composedPath?.()
+      .find((node) => node instanceof Element && node.matches(ACTIONABLE)) ??
+    target.closest(ACTIONABLE);
+  if (!(actionable instanceof Element)) {
     return;
   }
   const { selector, text } = describeElement(actionable);
@@ -69,7 +85,7 @@ const isSensitive = (el: HTMLInputElement): boolean =>
   SENSITIVE_AUTOCOMPLETE.test(el.getAttribute("autocomplete") ?? "");
 
 export const onChange = (event: Event) => {
-  const el = event.target;
+  const el = eventTarget(event);
   const isTextual =
     (el instanceof HTMLInputElement &&
       el.type !== "checkbox" &&
@@ -99,8 +115,9 @@ export const onChange = (event: Event) => {
 };
 
 export const onSubmit = (event: Event) => {
-  if (recordingSuppressed() || !(event.target instanceof Element)) {
+  const target = eventTarget(event);
+  if (recordingSuppressed() || !(target instanceof Element)) {
     return;
   }
-  record({ kind: "submit", selector: describeElement(event.target).selector });
+  record({ kind: "submit", selector: describeElement(target).selector });
 };

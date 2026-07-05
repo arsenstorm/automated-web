@@ -9,11 +9,13 @@ export function WorkflowList({
   run,
   namingId,
   onChanged,
+  onEdit,
 }: {
   workflows: Workflow[];
   run: RunState | null;
   namingId: string | null;
   onChanged: () => void;
+  onEdit: (id: string) => void;
 }) {
   const groups = new Map<string, Workflow[]>();
   const sorted = [...workflows].sort((a, b) => b.createdAt - a.createdAt);
@@ -44,6 +46,7 @@ export function WorkflowList({
                 key={workflow.id}
                 namingId={namingId}
                 onChanged={onChanged}
+                onEdit={() => onEdit(workflow.id)}
                 run={run}
                 workflow={workflow}
               />

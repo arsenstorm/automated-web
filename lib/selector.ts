@@ -13,12 +13,18 @@ const MACHINE_ID = /\d{3,}|^:|__/;
 const MAX_TEXT_LENGTH = 40;
 const MAX_PATH_DEPTH = 3;
 
+/**
+ * Joins per-root selectors across shadow boundaries: `#host >>> button`.
+ * ponytail: an attribute value containing a literal " >>> " breaks the split.
+ */
+export const SHADOW_DELIM = " >>> ";
+
 /** Inside a quoted attribute selector only quotes and backslashes need escaping. */
 const escapeQuoted = (value: string): string => value.replace(/["\\]/g, "\\$&");
 
-const isUnique = (doc: Document, selector: string): boolean => {
+const isUnique = (root: Document | ShadowRoot, selector: string): boolean => {
   try {
-    return doc.querySelectorAll(selector).length === 1;
+    return root.querySelectorAll(selector).length === 1;
   } catch {
     return false;
   }
@@ -58,7 +64,11 @@ const attributeCandidates = (el: Element): string[] => {
 
 const nthOfTypeSegment = (el: Element): string => {
   const tag = el.tagName.toLowerCase();
-  const parent = el.parentElement;
+  // Direct children of a shadow root have no parentElement but still need
+  // positional segments among their root-level siblings.
+  const parent =
+    el.parentElement ??
+    (el.parentNode instanceof ShadowRoot ? el.parentNode : null);
   if (!parent) {
     return tag;
   }
@@ -96,9 +106,20 @@ const TAG_START = /^[a-z][\w-]*/i;
 
 /** Tag name of a selector's final segment ("main > p:nth-of-type(7) > a" → "a"). */
 export const lastTag = (selector: string): string =>
-  selector.split(">").pop()?.trim().match(TAG_START)?.[0].toLowerCase() ?? "";
+  selector
+    .split(SHADOW_DELIM)
+    .at(-1)
+    ?.split(">")
+    .pop()
+    ?.trim()
+    .match(TAG_START)?.[0]
+    .toLowerCase() ?? "";
 
-/** The single element of `tag` whose trimmed text equals `text`, else null. */
+/**
+ * The single element of `tag` whose trimmed text equals `text`, else null.
+ * ponytail: not shadow-aware — a text-rescue miss inside a shadow root just
+ * pauses the run, which is the safe behavior.
+ */
 export function findByText(
   doc: Document,
   tag: string,
@@ -116,13 +137,46 @@ export function findByText(
 /**
  * Describe an element with the most stable unique selector available:
  * id → data-testid → name → aria-label → short nth-of-type CSS path.
+ * Elements inside open shadow roots get a per-root chain joined with
+ * `SHADOW_DELIM`, host selectors first.
  */
 export function describeElement(el: Element): ElementDescriptor {
-  const doc = el.ownerDocument;
+  const root = el.getRootNode();
+  const scope = root instanceof ShadowRoot ? root : el.ownerDocument;
+  let selector = cssPath(el);
   for (const candidate of attributeCandidates(el)) {
-    if (isUnique(doc, candidate)) {
-      return { selector: candidate, text: trimmedText(el) };
+    if (isUnique(scope, candidate)) {
+      selector = candidate;
+      break;
     }
   }
-  return { selector: cssPath(el), text: trimmedText(el) };
+  if (root instanceof ShadowRoot) {
+    selector = describeElement(root.host).selector + SHADOW_DELIM + selector;
+  }
+  return { selector, text: trimmedText(el) };
+}
+
+/**
+ * Resolve a possibly shadow-chained selector: querySelector each segment,
+ * descending through open shadow roots between them. Null on any miss,
+ * closed root, or invalid selector.
+ */
+export function deepQuery(doc: Document, selector: string): Element | null {
+  let root: Document | ShadowRoot | null = doc;
+  let el: Element | null = null;
+  for (const segment of selector.split(SHADOW_DELIM)) {
+    if (!root) {
+      return null;
+    }
+    try {
+      el = root.querySelector(segment);
+    } catch {
+      return null;
+    }
+    if (!el) {
+      return null;
+    }
+    root = el.shadowRoot;
+  }
+  return el;
 }

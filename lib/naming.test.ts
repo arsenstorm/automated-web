@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { suggestName } from "./naming";
+import { describeStep, suggestName } from "./naming";
 import type { StepAction } from "./types";
 
 const ORIGIN = "https://example.com";
@@ -70,6 +70,22 @@ describe("suggestName", () => {
     expect(suggestName(input, HOST)).toBe("Fill a form on example.com");
     expect(suggestName([{ kind: "navigate", url: ORIGIN }], HOST)).toBe(
       "Workflow on example.com"
+    );
+  });
+});
+
+describe("describeStep", () => {
+  it("labels each kind", () => {
+    expect(describeStep({ kind: "navigate", url: `${ORIGIN}/a` })).toBe(
+      "Open example.com"
+    );
+    expect(describeStep({ kind: "click", selector: "#go", text: "Go" })).toBe(
+      "Click Go"
+    );
+    expect(describeStep({ kind: "sleep", ms: 5000 })).toBe("Wait 5s");
+    expect(describeStep({ kind: "pause" })).toBe("Pause for me");
+    expect(describeStep({ kind: "extract", selector: ".price" })).toBe(
+      "Extract text from .price"
     );
   });
 });
