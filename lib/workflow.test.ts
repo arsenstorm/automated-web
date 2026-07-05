@@ -13,8 +13,8 @@ describe("buildWorkflow", () => {
   it("prepends a navigate to the start URL when missing", () => {
     const workflow = buildWorkflow({
       actions: [CLICK],
-      startUrl: "https://example.com/app?tab=1",
       fingerprint: "abc",
+      startUrl: "https://example.com/app?tab=1",
     });
     expect(workflow.origin).toBe("https://example.com");
     expect(workflow.steps[0]).toEqual({
@@ -30,8 +30,8 @@ describe("buildWorkflow", () => {
         CLICK,
         { kind: "submit", selector: "form" },
       ],
-      startUrl: "https://example.com/form",
       fingerprint: "abc",
+      startUrl: "https://example.com/form",
     });
     expect(workflow.steps).toEqual([
       { kind: "navigate", url: "https://example.com/form" },
@@ -72,8 +72,8 @@ describe("validateSteps", () => {
           id: "s3",
           kind: "input",
           selector: "#note",
-          value: "was {{s2}}",
           sensitive: false,
+          value: "was {{s2}}",
         },
         { id: "s4", kind: "sleep", ms: 5000 },
         { id: "s5", kind: "pause" },
@@ -125,8 +125,8 @@ describe("validateSteps", () => {
           id: "s2",
           kind: "input",
           selector: "#note",
-          value: "{{s3}}",
           sensitive: false,
+          value: "{{s3}}",
         },
         { id: "s3", kind: "extract", selector: ".price" },
       ])

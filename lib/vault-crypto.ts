@@ -8,7 +8,7 @@ import type { VaultEntry } from "./types";
 const PBKDF2_ITERATIONS = 600_000;
 const IV_BYTES = 12;
 const SALT_BYTES = 16;
-const AES_PARAMS = { name: "AES-GCM", length: 256 } as const;
+const AES_PARAMS = { length: 256, name: "AES-GCM" } as const;
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -53,10 +53,10 @@ export async function deriveKey(
   );
   return await crypto.subtle.deriveKey(
     {
+      hash: "SHA-256",
+      iterations: PBKDF2_ITERATIONS,
       name: "PBKDF2",
       salt: fromBase64(saltBase64),
-      iterations: PBKDF2_ITERATIONS,
-      hash: "SHA-256",
     },
     material,
     AES_PARAMS,
@@ -71,11 +71,11 @@ export async function encryptValue(
 ): Promise<VaultEntry> {
   const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
   const data = await crypto.subtle.encrypt(
-    { name: "AES-GCM", iv },
+    { iv, name: "AES-GCM" },
     key,
     encoder.encode(value)
   );
-  return { iv: toBase64(iv), data: toBase64(new Uint8Array(data)) };
+  return { data: toBase64(new Uint8Array(data)), iv: toBase64(iv) };
 }
 
 /** Throws on wrong key or tampered ciphertext (AES-GCM auth tag). */
@@ -84,7 +84,7 @@ export async function decryptValue(
   entry: VaultEntry
 ): Promise<string> {
   const plain = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv: fromBase64(entry.iv) },
+    { iv: fromBase64(entry.iv), name: "AES-GCM" },
     key,
     fromBase64(entry.data)
   );

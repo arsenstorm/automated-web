@@ -1,6 +1,14 @@
 /** Inline name editor for a workflow row. */
 
-import { useEffect, useRef, useState } from "react";
+import {
+  type ChangeEvent,
+  type FormEvent,
+  type KeyboardEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { FOCUS_RING_INSET } from "@/components/styles";
 import { fireAndForget, sendMessage } from "@/lib/messaging";
 import type { Workflow } from "@/lib/types";
@@ -26,17 +34,41 @@ export function RenameForm({
     inputRef.current?.focus();
   }, []);
 
-  const submit = (restoreFocus: boolean) => {
-    const trimmed = name.trim();
-    if (trimmed && trimmed !== workflow.name) {
-      fireAndForget(
-        sendMessage("renameWorkflow", { id: workflow.id, name: trimmed }),
-        () => onDone(restoreFocus)
-      );
-      return;
-    }
-    onDone(restoreFocus);
-  };
+  const submit = useCallback(
+    (restoreFocus: boolean) => {
+      const trimmed = name.trim();
+      if (trimmed && trimmed !== workflow.name) {
+        fireAndForget(
+          sendMessage("renameWorkflow", { id: workflow.id, name: trimmed }),
+          () => onDone(restoreFocus)
+        );
+        return;
+      }
+      onDone(restoreFocus);
+    },
+    [name, workflow.id, workflow.name, onDone]
+  );
+
+  const handleSubmit = useCallback(
+    (event: FormEvent) => {
+      event.preventDefault();
+      submit(true);
+    },
+    [submit]
+  );
+  const handleBlur = useCallback(() => submit(false), [submit]);
+  const handleChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => setName(event.target.value),
+    []
+  );
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === "Escape") {
+        onDone(true);
+      }
+    },
+    [onDone]
+  );
 
   return (
     <form
@@ -44,10 +76,7 @@ export function RenameForm({
       // box-shadow, so the input's text sits exactly where the name text
       // was — no layout shift on swap.
       className="-mx-2 -my-1"
-      onSubmit={(event) => {
-        event.preventDefault();
-        submit(true);
-      }}
+      onSubmit={handleSubmit}
     >
       <label className="sr-only" htmlFor={`rename-${workflow.id}`}>
         Workflow name
@@ -56,13 +85,9 @@ export function RenameForm({
         className={`w-full rounded-md bg-transparent px-2 py-1 font-medium text-sm ring-1 ring-input placeholder:text-muted-foreground ${FOCUS_RING_INSET}`}
         id={`rename-${workflow.id}`}
         name={`rename-${workflow.id}`}
-        onBlur={() => submit(false)}
-        onChange={(event) => setName(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") {
-            onDone(true);
-          }
-        }}
+        onBlur={handleBlur}
+        onChange={handleChange}
+        onKeyDown={handleKeyDown}
         placeholder={workflow.name}
         ref={inputRef}
         value={name}

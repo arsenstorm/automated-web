@@ -14,7 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { Reorder } from "motion/react";
-import { useState } from "react";
+import { type RefObject, useCallback, useState } from "react";
 import { IconButton, SmallButton } from "@/components/buttons";
 import { ErrorNotice } from "@/components/error-notice";
 import { PopoverMenu } from "@/components/popover-menu";
@@ -34,43 +34,124 @@ const ADDABLE: {
   make: (id: string) => StepAction;
 }[] = [
   {
-    label: "Open a page",
     icon: Globe,
+    label: "Open a page",
     make: (id) => ({ id, kind: "navigate", url: "" }),
   },
   {
-    label: "Click an element",
     icon: MousePointerClick,
+    label: "Click an element",
     make: (id) => ({ id, kind: "click", selector: "" }),
   },
   {
-    label: "Type text",
     icon: Type,
+    label: "Type text",
     make: (id) => ({
       id,
       kind: "input",
       selector: "",
-      value: "",
       sensitive: false,
+      value: "",
     }),
   },
   {
-    label: "Submit a form",
     icon: Send,
+    label: "Submit a form",
     make: (id) => ({ id, kind: "submit", selector: "" }),
   },
   {
-    label: "Wait",
     icon: Timer,
+    label: "Wait",
     make: (id) => ({ id, kind: "sleep", ms: DEFAULT_SLEEP_MS }),
   },
-  { label: "Pause for me", icon: Pause, make: (id) => ({ id, kind: "pause" }) },
+  { icon: Pause, label: "Pause for me", make: (id) => ({ id, kind: "pause" }) },
   {
-    label: "Extract text",
     icon: ScanText,
+    label: "Extract text",
     make: (id) => ({ id, kind: "extract", selector: "" }),
   },
 ];
+
+type Addable = (typeof ADDABLE)[number];
+
+function AddStepItem({
+  entry,
+  close,
+  onAdd,
+}: {
+  entry: Addable;
+  close: () => void;
+  onAdd: (make: Addable["make"]) => void;
+}) {
+  const { label, icon: Icon, make } = entry;
+  const handleClick = useCallback(() => {
+    close();
+    onAdd(make);
+  }, [close, onAdd, make]);
+  return (
+    <button
+      className={cn(MENU_ITEM, "flex items-center gap-2")}
+      onClick={handleClick}
+      type="button"
+    >
+      <Icon
+        aria-hidden="true"
+        className="size-4 shrink-0 text-muted-foreground"
+      />
+      {label}
+    </button>
+  );
+}
+
+/** Wires one draft step's row to index-based callbacks with stable handlers. */
+function DraftStepRow({
+  index,
+  step,
+  draftLength,
+  earlierOutputs,
+  expanded,
+  onUpdate,
+  onMove,
+  onRemove,
+  onToggle,
+}: {
+  index: number;
+  step: StepAction;
+  draftLength: number;
+  earlierOutputs: OutputOption[];
+  expanded: boolean;
+  onUpdate: (index: number, step: StepAction) => void;
+  onMove: (index: number, delta: -1 | 1) => void;
+  onRemove: (index: number) => void;
+  onToggle: (id: string | undefined) => void;
+}) {
+  const handleChange = useCallback(
+    (next: StepAction) => onUpdate(index, next),
+    [onUpdate, index]
+  );
+  const handleMove = useCallback(
+    (delta: -1 | 1) => onMove(index, delta),
+    [onMove, index]
+  );
+  const handleRemove = useCallback(() => onRemove(index), [onRemove, index]);
+  const handleToggle = useCallback(
+    () => onToggle(step.id),
+    [onToggle, step.id]
+  );
+  return (
+    <StepRow
+      earlierOutputs={earlierOutputs}
+      expanded={expanded}
+      moveDownDisabled={index >= draftLength - 1}
+      moveUpDisabled={index <= 1}
+      onChange={handleChange}
+      onMove={handleMove}
+      onRemove={handleRemove}
+      onToggle={handleToggle}
+      step={step}
+    />
+  );
+}
 
 export function TimelineView({
   workflow,
@@ -104,41 +185,68 @@ export function TimelineView({
           : []
       );
 
-  const update = (index: number, step: StepAction) => {
-    setDraft(draft.map((existing, i) => (i === index ? step : existing)));
-  };
+  const update = useCallback(
+    (index: number, step: StepAction) => {
+      setDraft(draft.map((existing, i) => (i === index ? step : existing)));
+    },
+    [draft]
+  );
 
-  const remove = (index: number) => {
-    setDraft(draft.filter((_, i) => i !== index));
-  };
+  const updateFirst = useCallback(
+    (step: StepAction) => update(0, step),
+    [update]
+  );
 
-  const move = (index: number, delta: -1 | 1) => {
-    const target = index + delta;
-    // Slot 0 is the pinned navigate.
-    if (target < 1 || target >= draft.length) {
-      return;
-    }
-    const next = [...draft];
-    const [moved] = next.splice(index, 1);
-    if (!moved) {
-      return;
-    }
-    next.splice(target, 0, moved);
-    setDraft(next);
-    setAnnounce(`Moved to position ${target + 1} of ${draft.length}`);
-  };
+  const remove = useCallback(
+    (index: number) => {
+      setDraft(draft.filter((_, i) => i !== index));
+    },
+    [draft]
+  );
 
-  const add = (make: (id: string) => StepAction) => {
-    const step = make(nextStepId(draft));
-    setDraft([...draft, step]);
-    setExpandedId(step.id ?? null);
-  };
+  const move = useCallback(
+    (index: number, delta: -1 | 1) => {
+      const target = index + delta;
+      // Slot 0 is the pinned navigate.
+      if (target < 1 || target >= draft.length) {
+        return;
+      }
+      const next = [...draft];
+      const [moved] = next.splice(index, 1);
+      if (!moved) {
+        return;
+      }
+      next.splice(target, 0, moved);
+      setDraft(next);
+      setAnnounce(`Moved to position ${target + 1} of ${draft.length}`);
+    },
+    [draft]
+  );
 
-  const toggle = (id: string | undefined) => {
-    setExpandedId(expandedId === id ? null : (id ?? null));
-  };
+  const add = useCallback(
+    (make: (id: string) => StepAction) => {
+      const step = make(nextStepId(draft));
+      setDraft([...draft, step]);
+      setExpandedId(step.id ?? null);
+    },
+    [draft]
+  );
 
-  const save = async () => {
+  const toggle = useCallback(
+    (id: string | undefined) => {
+      setExpandedId(expandedId === id ? null : (id ?? null));
+    },
+    [expandedId]
+  );
+
+  const toggleFirst = useCallback(() => toggle(first?.id), [toggle, first?.id]);
+
+  const reorderRest = useCallback(
+    (next: StepAction[]) => setDraft(first ? [first, ...next] : next),
+    [first]
+  );
+
+  const save = useCallback(async () => {
     setSaving(true);
     setSaveError(null);
     try {
@@ -152,15 +260,33 @@ export function TimelineView({
       setSaveError(error instanceof Error ? error.message : "Could not save");
       setSaving(false);
     }
-  };
+  }, [workflow.id, draft, onChanged, onBack]);
 
-  const back = () => {
+  const handleSave = useCallback(() => {
+    save().catch(() => null);
+  }, [save]);
+
+  const back = useCallback(() => {
     if (dirty && !leaving) {
       setLeaving(true);
       return;
     }
     onBack();
-  };
+  }, [dirty, leaving, onBack]);
+
+  const renderAddTrigger = useCallback(
+    (props: {
+      "aria-expanded": boolean;
+      onClick: () => void;
+      ref: RefObject<HTMLButtonElement | null>;
+    }) => (
+      <SmallButton className="flex items-center gap-1.5" {...props}>
+        <Plus aria-hidden="true" className="size-4 shrink-0" />
+        Add step
+      </SmallButton>
+    ),
+    []
+  );
 
   return (
     <main className="flex flex-1 flex-col gap-4">
@@ -179,38 +305,36 @@ export function TimelineView({
         {announce}
       </p>
       <div className="flex flex-col">
-        {first && (
+        {first ? (
           <StepRow
             earlierOutputs={[]}
             expanded={expandedId === first.id}
-            onChange={(step) => update(0, step)}
-            onToggle={() => toggle(first.id)}
+            onChange={updateFirst}
+            onToggle={toggleFirst}
             pinned
             step={first}
           />
-        )}
+        ) : null}
         <Reorder.Group
           as="ol"
           axis="y"
           className="flex flex-col"
-          onReorder={(next: StepAction[]) =>
-            setDraft(first ? [first, ...next] : next)
-          }
+          onReorder={reorderRest}
           values={rest}
         >
           {rest.map((step, restIndex) => {
             const index = restIndex + 1;
             return (
-              <StepRow
+              <DraftStepRow
+                draftLength={draft.length}
                 earlierOutputs={outputsBefore(index)}
                 expanded={expandedId === step.id}
+                index={index}
                 key={step.id ?? index}
-                moveDownDisabled={index >= draft.length - 1}
-                moveUpDisabled={index <= 1}
-                onChange={(nextStep) => update(index, nextStep)}
-                onMove={(delta) => move(index, delta)}
-                onRemove={() => remove(index)}
-                onToggle={() => toggle(step.id)}
+                onMove={move}
+                onRemove={remove}
+                onToggle={toggle}
+                onUpdate={update}
                 step={step}
               />
             );
@@ -220,30 +344,16 @@ export function TimelineView({
       <PopoverMenu
         align="left"
         menuClassName="min-w-44"
-        renderTrigger={(props) => (
-          <SmallButton className="flex items-center gap-1.5" {...props}>
-            <Plus aria-hidden="true" className="size-4 shrink-0" />
-            Add step
-          </SmallButton>
-        )}
+        renderTrigger={renderAddTrigger}
       >
         {(close) =>
-          ADDABLE.map(({ label, icon: Icon, make }) => (
-            <button
-              className={cn(MENU_ITEM, "flex items-center gap-2")}
-              key={label}
-              onClick={() => {
-                close();
-                add(make);
-              }}
-              type="button"
-            >
-              <Icon
-                aria-hidden="true"
-                className="size-4 shrink-0 text-muted-foreground"
-              />
-              {label}
-            </button>
+          ADDABLE.map((entry) => (
+            <AddStepItem
+              close={close}
+              entry={entry}
+              key={entry.label}
+              onAdd={add}
+            />
           ))
         }
       </PopoverMenu>
@@ -258,9 +368,7 @@ export function TimelineView({
         <button
           className={PRIMARY_BUTTON}
           disabled={!dirty || saving || validationError !== null}
-          onClick={() => {
-            save().catch(() => null);
-          }}
+          onClick={handleSave}
           type="button"
         >
           Save changes

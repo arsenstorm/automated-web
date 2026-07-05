@@ -16,8 +16,8 @@ describe("resolveStep", () => {
     const step: StepAction = {
       kind: "input",
       selector: "#note",
-      value: "Order {{s1}} shipped",
       sensitive: false,
+      value: "Order {{s1}} shipped",
     };
     expect(resolveStep(step, outputs)).toEqual({
       step: { ...step, value: "Order ABC-123 shipped" },
@@ -43,8 +43,8 @@ describe("resolveStep", () => {
     const step: StepAction = {
       kind: "input",
       selector: "#note",
-      value: "{{s1}} {{s9}}",
       sensitive: false,
+      value: "{{s1}} {{s9}}",
     };
     expect(resolveStep(step, outputs)).toEqual({ missing: ["s9"] });
   });

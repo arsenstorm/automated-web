@@ -9,7 +9,7 @@ describe("suggestName", () => {
   it("names flows with a password input as logins", () => {
     const actions: StepAction[] = [
       { kind: "navigate", url: `${ORIGIN}/login` },
-      { kind: "input", selector: "#password", value: "r", sensitive: true },
+      { kind: "input", selector: "#password", sensitive: true, value: "r" },
       { kind: "submit", selector: "form" },
     ];
     expect(suggestName(actions, HOST)).toBe("Log in to example.com");
@@ -20,8 +20,8 @@ describe("suggestName", () => {
       {
         kind: "input",
         selector: 'input[name="q"]',
-        value: "r",
         sensitive: false,
+        value: "r",
       },
       { kind: "submit", selector: "form" },
     ];
@@ -65,7 +65,7 @@ describe("suggestName", () => {
 
   it("falls back for input-only and bare flows", () => {
     const input: StepAction[] = [
-      { kind: "input", selector: "#note", value: "r", sensitive: false },
+      { kind: "input", selector: "#note", sensitive: false, value: "r" },
     ];
     expect(suggestName(input, HOST)).toBe("Fill a form on example.com");
     expect(suggestName([{ kind: "navigate", url: ORIGIN }], HOST)).toBe(

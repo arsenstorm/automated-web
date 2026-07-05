@@ -2,7 +2,14 @@
 
 import { cn } from "cnfast";
 import { X } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import {
+  type ChangeEvent,
+  type FormEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 import { IconButton, SmallButton } from "@/components/buttons";
 import { INPUT } from "@/components/styles";
 import { Switch } from "@/components/switch";
@@ -42,14 +49,17 @@ function RecordingSettings() {
     fireAndForget(getStored("settings").then(setSettings));
   }, []);
 
-  const setRecordSecrets = (recordSecrets: boolean) => {
-    if (!settings) {
-      return;
-    }
-    const next = { ...settings, recordSecrets };
-    setSettings(next);
-    setStored("settings", next).catch(() => null);
-  };
+  const setRecordSecrets = useCallback(
+    (recordSecrets: boolean) => {
+      if (!settings) {
+        return;
+      }
+      const next = { ...settings, recordSecrets };
+      setSettings(next);
+      setStored("settings", next).catch(() => null);
+    },
+    [settings]
+  );
 
   return (
     <SettingRow
@@ -77,12 +87,31 @@ function VaultSettings({
   const [editing, setEditing] = useState(false);
   const [password, setPassword] = useState("");
 
-  const submit = async () => {
+  const submit = useCallback(async () => {
     await sendMessage("setVaultPassword", password);
     setPassword("");
     setEditing(false);
     onChanged();
-  };
+  }, [password, onChanged]);
+
+  const toggleEditing = useCallback(() => setEditing((open) => !open), []);
+
+  const handleSubmit = useCallback(
+    (event: FormEvent) => {
+      event.preventDefault();
+      submit().catch(() => null);
+    },
+    [submit]
+  );
+
+  const handlePasswordChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => setPassword(event.target.value),
+    []
+  );
+
+  const lockVault = useCallback(() => {
+    fireAndForget(sendMessage("lockVault"), onChanged);
+  }, [onChanged]);
 
   return (
     <section className="flex flex-col gap-4">
@@ -95,18 +124,12 @@ function VaultSettings({
           }
           label="Vault password"
         >
-          <SmallButton onClick={() => setEditing((open) => !open)}>
+          <SmallButton onClick={toggleEditing}>
             {hasPassword ? "Change password" : "Set password"}
           </SmallButton>
         </SettingRow>
         <Expand show={editing}>
-          <form
-            className="flex gap-2 pt-2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              submit().catch(() => null);
-            }}
-          >
+          <form className="flex gap-2 pt-2" onSubmit={handleSubmit}>
             <label className="sr-only" htmlFor="vault-password">
               Vault password
             </label>
@@ -115,7 +138,7 @@ function VaultSettings({
               id="vault-password"
               minLength={8}
               name="vault-password"
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={handlePasswordChange}
               placeholder={
                 hasPassword ? "New vault password" : "Vault password"
               }
@@ -135,12 +158,7 @@ function VaultSettings({
         }
         label="Lock vault"
       >
-        <SmallButton
-          disabled={!hasPassword}
-          onClick={() => {
-            fireAndForget(sendMessage("lockVault"), onChanged);
-          }}
-        >
+        <SmallButton disabled={!hasPassword} onClick={lockVault}>
           Lock
         </SmallButton>
       </SettingRow>

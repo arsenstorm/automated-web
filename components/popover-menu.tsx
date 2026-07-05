@@ -82,7 +82,7 @@ export function PopoverMenu({
         ref: triggerRef,
       })}
       <AnimatePresence>
-        {open && (
+        {open ? (
           <motion.div
             animate={{ opacity: 1, scale: 1, y: 0 }}
             className={cn(
@@ -96,7 +96,7 @@ export function PopoverMenu({
           >
             {children(() => setOpen(false))}
           </motion.div>
-        )}
+        ) : null}
       </AnimatePresence>
     </div>
   );

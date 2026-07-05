@@ -140,14 +140,16 @@ export const setVaultPassword = async (password: string): Promise<void> => {
   const salt = randomSalt();
   const newKey = await deriveKey(password, salt);
   const write: Record<string, unknown> = {
-    vaultMeta: { salt, check: await encryptValue(newKey, CHECK_VALUE) },
+    vaultMeta: { check: await encryptValue(newKey, CHECK_VALUE), salt },
   };
-  for (const key of SECURE_KEYS) {
-    write[key] = await encryptValue(
-      newKey,
-      JSON.stringify(await getSecure(key))
-    );
-  }
+  await Promise.all(
+    SECURE_KEYS.map(async (key) => {
+      write[key] = await encryptValue(
+        newKey,
+        JSON.stringify(await getSecure(key))
+      );
+    })
+  );
   // Single write: a crash can't leave data encrypted under an unsaved key.
   await browser.storage.local.set(write);
   await browser.storage.session.set({ [SESSION_KEY]: await exportKey(newKey) });

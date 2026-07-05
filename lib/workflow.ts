@@ -20,11 +20,11 @@ export function buildWorkflow(options: {
   const { actions, startUrl, fingerprint } = options;
   const steps = toWorkflowSteps(actions);
   return {
-    id: crypto.randomUUID(),
-    origin: new URL(startUrl).origin,
-    name: suggestName(actions, new URL(startUrl).host),
     createdAt: Date.now(),
     fingerprint,
+    id: crypto.randomUUID(),
+    name: suggestName(actions, new URL(startUrl).host),
+    origin: new URL(startUrl).origin,
     steps:
       steps[0]?.kind === "navigate"
         ? steps
@@ -56,14 +56,7 @@ export function ensureStepIds(steps: StepAction[]): StepAction[] {
   return filled;
 }
 
-const parseableUrl = (url: string): boolean => {
-  try {
-    new URL(url);
-    return true;
-  } catch {
-    return false;
-  }
-};
+const parseableUrl = (url: string): boolean => URL.canParse(url);
 
 const stepError = (
   step: StepAction,

@@ -3,7 +3,14 @@
 import { cn } from "cnfast";
 import { KeyRound, Lock, TriangleAlert } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { type ReactNode, useEffect, useState } from "react";
+import {
+  type ChangeEvent,
+  type FormEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 import { StepCard } from "@/components/step-card";
 import {
   DESTRUCTIVE_BUTTON,
@@ -35,7 +42,7 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
     return () => clearTimeout(timer);
   }, [error]);
 
-  const submit = async () => {
+  const submit = useCallback(async () => {
     const ok = await sendMessage("unlockVault", password);
     if (ok) {
       // Keep the password in the field — the screen is exiting, and clearing
@@ -45,95 +52,61 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
     }
     setError(true);
     setPassword("");
-  };
+  }, [password, onUnlocked]);
+
+  const handleSubmit = useCallback(
+    (event: FormEvent) => {
+      event.preventDefault();
+      submit().catch(() => setError(true));
+    },
+    [submit]
+  );
+
+  const handlePasswordChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      setError(false);
+      setPassword(event.target.value);
+    },
+    []
+  );
 
   const go = (next: Step) => () => {
     setError(false);
     setStep(next);
   };
 
-  const reset = () => {
+  const reset = useCallback(() => {
     fireAndForget(sendMessage("resetVault"), onUnlocked);
-  };
+  }, [onUnlocked]);
 
   const steps: Record<Step, ReactNode> = {
-    unlock: (
+    confirm: (
       <StepCard
-        description={
-          // Persistent live region so the wrong-password swap is announced.
-          <span className="block" id="unlock-message" role="status">
-            <AnimatePresence initial={false} mode="popLayout">
-              <motion.span
-                {...fade}
-                className={cn("block", error && "text-destructive")}
-                key={error ? "error" : "hint"}
-              >
-                {error
-                  ? "That password isn't right — give it another try."
-                  : "Enter your vault password to record and run workflows."}
-              </motion.span>
-            </AnimatePresence>
-          </span>
-        }
+        danger
+        description="Resetting the vault permanently deletes every recorded workflow and saved input. This can't be undone."
         icon={
-          <Lock aria-hidden="true" className="size-5 text-muted-foreground" />
-        }
-        title="Vault locked"
-      >
-        <form
-          className="mt-4 flex w-full max-w-56 flex-col gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            submit().catch(() => setError(true));
-          }}
-        >
-          <label className="sr-only" htmlFor="unlock-password">
-            Vault password
-          </label>
-          <motion.input
-            animate={
-              // Subtle red border plus a bolder ring with a 2px gap — the
-              // "outline" is a box-shadow so it never fights the focus outline.
-              error
-                ? {
-                    borderColor: "var(--destructive)",
-                    boxShadow:
-                      "0 0 0 2px var(--background), 0 0 0 4px var(--destructive)",
-                  }
-                : {
-                    borderColor: "var(--input)",
-                    boxShadow: "0 0 0 0px transparent, 0 0 0 0px transparent",
-                  }
-            }
-            aria-describedby="unlock-message"
-            aria-invalid={error}
-            className={cn(
-              INPUT,
-              "text-center",
-              error && "focus-visible:outline-destructive"
-            )}
-            id="unlock-password"
-            name="unlock-password"
-            onChange={(event) => {
-              setError(false);
-              setPassword(event.target.value);
-            }}
-            placeholder="Vault password"
-            required
-            transition={{ duration }}
-            type="password"
-            value={password}
+          <TriangleAlert
+            aria-hidden="true"
+            className="size-5 text-destructive"
           />
-          <button className={PRIMARY_BUTTON} type="submit">
-            Unlock
-          </button>
-        </form>
+        }
+        title="Your workflows will be lost"
+      >
+        {/* spacer to stop layout shift from previous section */}
+        <div className="h-1.5" />
+        <button
+          className={cn(PRIMARY_BUTTON, "mt-4")}
+          onClick={go("reset")}
+          type="button"
+        >
+          I understand, continue
+        </button>
         <button
           className={cn(GHOST_TEXT_BUTTON, "mt-1")}
           onClick={go("explain")}
           type="button"
         >
-          Forgot your password?
+          Back
         </button>
       </StepCard>
     ),
@@ -160,36 +133,6 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
         <button
           className={cn(GHOST_TEXT_BUTTON, "mt-1")}
           onClick={go("unlock")}
-          type="button"
-        >
-          Back
-        </button>
-      </StepCard>
-    ),
-    confirm: (
-      <StepCard
-        danger
-        description="Resetting the vault permanently deletes every recorded workflow and saved input. This can't be undone."
-        icon={
-          <TriangleAlert
-            aria-hidden="true"
-            className="size-5 text-destructive"
-          />
-        }
-        title="Your workflows will be lost"
-      >
-        {/* spacer to stop layout shift from previous section */}
-        <div className="h-1.5" />
-        <button
-          className={cn(PRIMARY_BUTTON, "mt-4")}
-          onClick={go("reset")}
-          type="button"
-        >
-          I understand, continue
-        </button>
-        <button
-          className={cn(GHOST_TEXT_BUTTON, "mt-1")}
-          onClick={go("explain")}
           type="button"
         >
           Back
@@ -223,6 +166,80 @@ export function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
           type="button"
         >
           Cancel
+        </button>
+      </StepCard>
+    ),
+    unlock: (
+      <StepCard
+        description={
+          // Persistent live region so the wrong-password swap is announced.
+          <span className="block" id="unlock-message" role="status">
+            <AnimatePresence initial={false} mode="popLayout">
+              <motion.span
+                {...fade}
+                className={cn("block", error && "text-destructive")}
+                key={error ? "error" : "hint"}
+              >
+                {error
+                  ? "That password isn't right — give it another try."
+                  : "Enter your vault password to record and run workflows."}
+              </motion.span>
+            </AnimatePresence>
+          </span>
+        }
+        icon={
+          <Lock aria-hidden="true" className="size-5 text-muted-foreground" />
+        }
+        title="Vault locked"
+      >
+        <form
+          className="mt-4 flex w-full max-w-56 flex-col gap-2"
+          onSubmit={handleSubmit}
+        >
+          <label className="sr-only" htmlFor="unlock-password">
+            Vault password
+          </label>
+          <motion.input
+            animate={
+              // Subtle red border plus a bolder ring with a 2px gap — the
+              // "outline" is a box-shadow so it never fights the focus outline.
+              error
+                ? {
+                    borderColor: "var(--destructive)",
+                    boxShadow:
+                      "0 0 0 2px var(--background), 0 0 0 4px var(--destructive)",
+                  }
+                : {
+                    borderColor: "var(--input)",
+                    boxShadow: "0 0 0 0px transparent, 0 0 0 0px transparent",
+                  }
+            }
+            aria-describedby="unlock-message"
+            aria-invalid={error}
+            className={cn(
+              INPUT,
+              "text-center",
+              error && "focus-visible:outline-destructive"
+            )}
+            id="unlock-password"
+            name="unlock-password"
+            onChange={handlePasswordChange}
+            placeholder="Vault password"
+            required
+            transition={{ duration }}
+            type="password"
+            value={password}
+          />
+          <button className={PRIMARY_BUTTON} type="submit">
+            Unlock
+          </button>
+        </form>
+        <button
+          className={cn(GHOST_TEXT_BUTTON, "mt-1")}
+          onClick={go("explain")}
+          type="button"
+        >
+          Forgot your password?
         </button>
       </StepCard>
     ),

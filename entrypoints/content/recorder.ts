@@ -36,7 +36,7 @@ const eventTarget = (event: Event): EventTarget | null => {
 };
 
 export const record = (action: StepAction) => {
-  buffer.push({ ts: Date.now(), origin: location.origin, action });
+  buffer.push({ action, origin: location.origin, ts: Date.now() });
 };
 
 /** Record a navigation, deduping when pageshow + popstate fire together. */
@@ -109,8 +109,8 @@ export const onChange = (event: Event) => {
   record({
     kind: "input",
     selector,
-    value: sensitive && !recordSecrets ? "" : el.value,
     sensitive,
+    value: sensitive && !recordSecrets ? "" : el.value,
   });
 };
 

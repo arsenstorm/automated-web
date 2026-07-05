@@ -15,10 +15,8 @@ import { showToast } from "./toast";
 const FLUSH_INTERVAL_MS = 5000;
 
 export default defineContentScript({
-  matches: ["<all_urls>"],
   // Record and replay inside iframes too.
   allFrames: true,
-  matchAboutBlank: true,
   main() {
     const isTop = window.self === window.top;
     const syncRecordSecrets = () => {
@@ -65,4 +63,10 @@ export default defineContentScript({
     onMessage("executeStep", ({ data }) => executeStep(data.step));
     onMessage("flushNow", () => flush());
   },
+  // Firefox doesn't support matchOriginAsFallback; Chrome needs it to
+  // inject into opaque-origin frames (sandboxed srcdoc without
+  // allow-same-origin) that matchAboutBlank can't reach.
+  matchAboutBlank: true,
+  matches: ["<all_urls>"],
+  matchOriginAsFallback: true,
 });

@@ -48,11 +48,12 @@ const waitForTabComplete = (tabId: number): Promise<boolean> =>
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const pingContent = async (tabId: number): Promise<boolean> => {
-  for (let attempt = 0; attempt < PING_RETRIES; attempt++) {
+  for (let attempt = 0; attempt < PING_RETRIES; attempt += 1) {
     try {
       // The content script runs in every frame; pin the main frame so the
       // promise doesn't resolve off whichever frame answers first.
-      await sendMessage("ping", undefined, { tabId, frameId: 0 });
+      // biome-ignore lint/performance/noAwaitInLoops: retry/backoff loop — each attempt must finish before the next.
+      await sendMessage("ping", undefined, { frameId: 0, tabId });
       return true;
     } catch {
       await sleep(PING_RETRY_MS);
@@ -68,7 +69,7 @@ const navigateStep = async (
   await browser.tabs.update(tabId, { url });
   const loaded = await waitForTabComplete(tabId);
   if (!(loaded && (await pingContent(tabId)))) {
-    return { ok: false, reason: "timeout", detail: "page did not load" };
+    return { detail: "page did not load", ok: false, reason: "timeout" };
   }
   return { ok: true };
 };
@@ -81,6 +82,7 @@ const keepAliveSleep = async (ms: number) => {
   let remaining = Math.min(Math.max(ms, 0), MAX_SLEEP_MS);
   while (remaining > 0) {
     const chunk = Math.min(remaining, KEEPALIVE_CHUNK_MS);
+    // biome-ignore lint/performance/noAwaitInLoops: chunked sleep — waits are sequential by design.
     await sleep(chunk);
     remaining -= chunk;
     await browser.storage.local.get("run");
@@ -156,21 +158,21 @@ const executeOneStep = async (
   const resolved = resolveStep(rawStep, run.outputs ?? {});
   if ("missing" in resolved) {
     return {
+      detail: `no output for ${resolved.missing.map((id) => `{{${id}}}`).join(", ")}`,
       ok: false,
       reason: "missing-output",
-      detail: `no output for ${resolved.missing.map((id) => `{{${id}}}`).join(", ")}`,
     };
   }
-  const step = resolved.step;
+  const { step } = resolved;
   if (step.kind === "sleep") {
     await keepAliveSleep(step.ms);
     return { ok: true };
   }
   if (step.kind === "pause") {
     return {
+      detail: "waiting for you — resume to continue",
       ok: false,
       reason: "pause",
-      detail: "waiting for you — resume to continue",
     };
   }
   if (step.kind === "navigate") {
@@ -184,20 +186,20 @@ const executeOneStep = async (
   const frameId = await frameForStep(run.tabId, step.frameUrl);
   if (frameId === null) {
     return {
+      detail: `frame not found: ${step.frameUrl}`,
       ok: false,
       reason: "timeout",
-      detail: `frame not found: ${step.frameUrl}`,
     };
   }
   return await sendMessage(
     "executeStep",
     { step },
-    { tabId: run.tabId, frameId }
+    { frameId, tabId: run.tabId }
   ).catch(
     (): StepResult => ({
+      detail: "tab not reachable",
       ok: false,
       reason: "timeout",
-      detail: "tab not reachable",
     })
   );
 };
@@ -214,6 +216,7 @@ const runLoop = async () => {
     return;
   }
   while (run.status === "running") {
+    // biome-ignore lint/performance/noAwaitInLoops: workflow steps must replay strictly in order.
     const result = await executeOneStep(run, workflow);
     const stepId: string | undefined = workflow.steps[run.stepIndex]?.id;
     if (
@@ -293,8 +296,11 @@ export const continueRun = async ({ skip }: { skip: boolean }) => {
     await setStored("run", null);
     return;
   }
-  // Resuming a pause step advances past it — re-running would pause forever.
-  const advance = skip || workflow.steps[run.stepIndex]?.kind === "pause";
+
+  const advance =
+    skip ||
+    workflow.steps[run.stepIndex]?.kind === "pause" ||
+    (run.pausedReason?.startsWith("secret") ?? false);
   const next = advance
     ? afterStep(resumedRun(run), { ok: true }, workflow.steps.length)
     : resumedRun(run);

@@ -55,7 +55,7 @@ describe("describeElement", () => {
     const doc = render(
       '<div><input name="q" /><section><input name="q" /></section></div>'
     );
-    const el = doc.querySelectorAll("input")[1];
+    const [, el] = doc.querySelectorAll("input");
     const { selector } = describeElement(el as Element);
     expect(doc.querySelectorAll(selector).length).toBe(1);
     expect(doc.querySelector(selector)).toBe(el);

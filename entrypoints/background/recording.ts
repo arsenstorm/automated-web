@@ -38,8 +38,8 @@ export const stopRecording = async (): Promise<Workflow | null> => {
   await Promise.all(
     frames.map((frame) =>
       sendMessage("flushNow", undefined, {
-        tabId: recording.tabId,
         frameId: frame.frameId,
+        tabId: recording.tabId,
       }).catch(() => null)
     )
   );
@@ -54,9 +54,9 @@ export const stopRecording = async (): Promise<Workflow | null> => {
   const workflows = await getSecure("workflows");
   const workflow = buildWorkflow({
     actions: events.map((event) => event.action),
-    startUrl: recording.startUrl,
     // Suppresses future toasts if the miner spots the same flow.
     fingerprint: fingerprintSession(events),
+    startUrl: recording.startUrl,
   });
   workflows.push(workflow);
   await setSecure("workflows", workflows);

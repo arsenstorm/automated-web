@@ -24,6 +24,7 @@ const waitForElement = async (selector: string): Promise<Element | null> => {
     if (Date.now() >= deadline) {
       return null;
     }
+    // biome-ignore lint/performance/noAwaitInLoops: polling loop — each wait must complete before re-checking.
     await sleep(POLL_INTERVAL_MS);
   }
 };
@@ -81,7 +82,7 @@ export const executeStep = async (step: StepAction): Promise<StepResult> => {
     el = findByText(document, lastTag(step.selector), step.text);
   }
   if (!el) {
-    return { ok: false, reason: "timeout", detail: step.selector };
+    return { detail: step.selector, ok: false, reason: "timeout" };
   }
   if (step.kind === "extract") {
     const output =
@@ -98,9 +99,9 @@ export const executeStep = async (step: StepAction): Promise<StepResult> => {
       el.focus();
     }
     return {
+      detail: "enter it on the page, then skip",
       ok: false,
       reason: "secret",
-      detail: "enter it on the page, then skip",
     };
   }
   suppressRecording(REPLAY_SUPPRESS_MS);

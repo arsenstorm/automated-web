@@ -1,7 +1,13 @@
 /** A workflow row: name, play/stop/replay control, options menu, inline player. */
 
 import { Play, RotateCcw, SkipForward, Square } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { IconButton } from "@/components/buttons";
 import { Expand, IconSwap } from "@/components/transitions";
 import { fireAndForget, sendMessage } from "@/lib/messaging";
@@ -26,7 +32,7 @@ export function WorkflowRow({
   /** Freshly recorded workflow whose row should open in naming mode. */
   namingId: string | null;
   onChanged: () => void;
-  onEdit: () => void;
+  onEdit: (id: string) => void;
 }) {
   const [renaming, setRenaming] = useState(workflow.id === namingId);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -45,18 +51,38 @@ export function WorkflowRow({
     return () => clearTimeout(timer);
   }, [done, onChanged]);
 
-  const play = () => {
+  const play = useCallback(() => {
     fireAndForget(sendMessage("startRun", workflow.id), onChanged);
-  };
+  }, [workflow.id, onChanged]);
 
   /** The background rejects edits while this workflow runs — stop it first. */
-  const edit = () => {
+  const edit = useCallback(() => {
     if (active && !done) {
-      fireAndForget(sendMessage("cancelRun"), onEdit);
+      fireAndForget(sendMessage("cancelRun"), () => onEdit(workflow.id));
       return;
     }
-    onEdit();
-  };
+    onEdit(workflow.id);
+  }, [active, done, onEdit, workflow.id]);
+
+  const finishRename = useCallback(
+    (restoreFocus: boolean) => {
+      setRenaming(false);
+      onChanged();
+      if (restoreFocus) {
+        // Back to the options menu, where the rename began; the
+        // input is about to unmount.
+        menuButtonRef.current?.focus();
+      }
+    },
+    [onChanged]
+  );
+  const startRename = useCallback(() => setRenaming(true), []);
+  const resume = useCallback(() => {
+    fireAndForget(sendMessage("resumeRun"), onChanged);
+  }, [onChanged]);
+  const skip = useCallback(() => {
+    fireAndForget(sendMessage("skipStep"), onChanged);
+  }, [onChanged]);
 
   /** The row's single play/stop/replay control, keyed for icon crossfades. */
   let control: {
@@ -104,18 +130,7 @@ export function WorkflowRow({
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
           {renaming ? (
-            <RenameForm
-              onDone={(restoreFocus) => {
-                setRenaming(false);
-                onChanged();
-                if (restoreFocus) {
-                  // Back to the options menu, where the rename began; the
-                  // input is about to unmount.
-                  menuButtonRef.current?.focus();
-                }
-              }}
-              workflow={workflow}
-            />
+            <RenameForm onDone={finishRename} workflow={workflow} />
           ) : (
             <p className="truncate font-medium text-sm">{workflow.name}</p>
           )}
@@ -123,12 +138,7 @@ export function WorkflowRow({
         <div className="flex shrink-0 gap-1">
           {active && run?.status === "paused" && (
             <>
-              <IconButton
-                label="Resume"
-                onClick={() => {
-                  fireAndForget(sendMessage("resumeRun"), onChanged);
-                }}
-              >
+              <IconButton label="Resume" onClick={resume}>
                 <Play
                   aria-hidden="true"
                   className="size-4 shrink-0 fill-current"
@@ -136,12 +146,7 @@ export function WorkflowRow({
               </IconButton>
               {/* A pause block resumes past itself, so skip adds nothing. */}
               {!isPauseBlock(run) && (
-                <IconButton
-                  label="Skip step"
-                  onClick={() => {
-                    fireAndForget(sendMessage("skipStep"), onChanged);
-                  }}
-                >
+                <IconButton label="Skip step" onClick={skip}>
                   <SkipForward aria-hidden="true" className="size-4 shrink-0" />
                 </IconButton>
               )}
@@ -157,14 +162,14 @@ export function WorkflowRow({
           <RowMenu
             onChanged={onChanged}
             onEdit={edit}
-            onRename={() => setRenaming(true)}
+            onRename={startRename}
             triggerRef={menuButtonRef}
             workflow={workflow}
           />
         </div>
       </div>
       <Expand show={active && run !== null}>
-        {run && (
+        {run ? (
           <InlinePlayer
             run={run}
             sleepMs={
@@ -174,7 +179,7 @@ export function WorkflowRow({
             }
             total={workflow.steps.length}
           />
-        )}
+        ) : null}
       </Expand>
     </li>
   );

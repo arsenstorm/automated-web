@@ -16,41 +16,41 @@ export type VaultStatus = "open" | "locked" | "no-password";
  * `sendMessage("name", data)` / `onMessage("name", handler)`.
  */
 export interface ProtocolMap {
-  cancelRecording(): void;
-  cancelRun(): void;
-  deleteWorkflow(id: string): void;
-  dismissSuggestion(data: { fingerprint: string; never: boolean }): void;
-  executeStep(data: { step: StepAction }): StepResult;
+  cancelRecording: () => void;
+  cancelRun: () => void;
+  deleteWorkflow: (id: string) => void;
+  dismissSuggestion: (data: { fingerprint: string; never: boolean }) => void;
+  executeStep: (data: { step: StepAction }) => StepResult;
   /** Ship buffered events immediately (used when a manual recording stops). */
-  flushNow(): void;
-  getRecording(): RecordingState | null;
-  getRunState(): RunState | null;
+  flushNow: () => void;
+  getRecording: () => RecordingState | null;
+  getRunState: () => RunState | null;
   // side panel → background
-  listWorkflows(): Workflow[];
+  listWorkflows: () => Workflow[];
   /** Drops the session key; the vault stays locked until unlocked again. */
-  lockVault(): void;
-  ping(): void;
+  lockVault: () => void;
+  ping: () => void;
   // content → background
-  recordEvents(events: RecordedEvent[]): void;
-  renameWorkflow(data: { id: string; name: string }): void;
+  recordEvents: (events: RecordedEvent[]) => void;
+  renameWorkflow: (data: { id: string; name: string }) => void;
   /** Forgot-password escape hatch: wipes the vault and everything keyed to it. */
-  resetVault(): void;
-  resumeRun(): void;
-  saveSuggestion(data: { fingerprint: string }): void;
-  setVaultPassword(password: string): void;
+  resetVault: () => void;
+  resumeRun: () => void;
+  saveSuggestion: (data: { fingerprint: string }) => void;
+  setVaultPassword: (password: string) => void;
   /** Skip the step a paused run is stuck on and continue. */
-  skipStep(): void;
+  skipStep: () => void;
   /** Returns false when there is no recordable active tab. */
-  startRecording(): boolean;
-  startRun(workflowId: string): void;
+  startRecording: () => boolean;
+  startRun: (workflowId: string) => void;
   /** Saves events since startRecording as a workflow; null if too short. */
-  stopRecording(): Workflow | null;
+  stopRecording: () => Workflow | null;
   // background → content (tab-targeted)
-  suggestWorkflow(data: { fingerprint: string; stepCount: number }): void;
-  unlockVault(password: string): boolean;
+  suggestWorkflow: (data: { fingerprint: string; stepCount: number }) => void;
+  unlockVault: (password: string) => boolean;
   /** Replace a workflow's steps (timeline editor). Throws when invalid. */
-  updateWorkflowSteps(data: { id: string; steps: StepAction[] }): void;
-  vaultStatus(): VaultStatus;
+  updateWorkflowSteps: (data: { id: string; steps: StepAction[] }) => void;
+  vaultStatus: () => VaultStatus;
 }
 
 export const { sendMessage, onMessage } =

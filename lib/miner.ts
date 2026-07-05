@@ -53,20 +53,15 @@ export function stampEvents(
   if (!(frameId && frameUrl)) {
     return events.map((event) => ({ ...event, tabId }));
   }
-  const tabOrigin = (() => {
-    try {
-      return tabUrl ? new URL(tabUrl).origin : undefined;
-    } catch {
-      return;
-    }
-  })();
+  const tabOrigin =
+    tabUrl && URL.canParse(tabUrl) ? new URL(tabUrl).origin : undefined;
   return events
     .filter((event) => event.action.kind !== "navigate")
     .map((event) => ({
       ...event,
-      tabId,
-      origin: tabOrigin ?? event.origin,
       action: { ...event.action, frameUrl },
+      origin: tabOrigin ?? event.origin,
+      tabId,
     }));
 }
 
@@ -173,13 +168,13 @@ export function mine(
     const fingerprint = fingerprintSession(sequence);
     const previous = next[fingerprint];
     next[fingerprint] = {
-      fingerprint,
-      origin: sequence[0]?.origin ?? "",
       count: (previous?.count ?? 0) + 1,
-      // Freshest steps win so replay uses the newest input values.
-      steps: sequence.map((event) => event.action),
+      fingerprint,
       lastSeen: sequence.at(-1)?.ts ?? 0,
       lastSuggestedAt: previous?.lastSuggestedAt,
+      origin: sequence[0]?.origin ?? "",
+      // Freshest steps win so replay uses the newest input values.
+      steps: sequence.map((event) => event.action),
     };
   }
   return next;

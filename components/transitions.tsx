@@ -19,7 +19,7 @@ export function Expand({
   const duration = useAnimDuration();
   return (
     <AnimatePresence initial={false}>
-      {show && (
+      {show ? (
         <motion.div
           animate={{ height: "auto", opacity: 1 }}
           className="overflow-hidden"
@@ -29,7 +29,7 @@ export function Expand({
         >
           {children}
         </motion.div>
-      )}
+      ) : null}
     </AnimatePresence>
   );
 }

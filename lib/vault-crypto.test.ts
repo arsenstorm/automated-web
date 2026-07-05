@@ -46,8 +46,8 @@ describe("vault crypto", () => {
     const bytes = Uint8Array.from(atob(entry.data), (c) => c.charCodeAt(0));
     bytes[0] = bytes[0] === undefined ? 0 : (bytes[0] + 1) % 256;
     const tampered = {
-      iv: entry.iv,
       data: btoa(String.fromCharCode(...bytes)),
+      iv: entry.iv,
     };
     await expect(decryptValue(key, tampered)).rejects.toThrow();
   });

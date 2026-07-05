@@ -20,7 +20,7 @@ describe("run-state transitions", () => {
 
   it("pauses with the failure reason and resumes at the same step", () => {
     let run = startedRun("wf-1", 7);
-    run = afterStep(run, { ok: false, reason: "timeout", detail: "#login" }, 3);
+    run = afterStep(run, { detail: "#login", ok: false, reason: "timeout" }, 3);
     expect(run.status).toBe("paused");
     expect(run.stepIndex).toBe(0);
     expect(run.pausedReason).toBe("timeout: #login");

@@ -11,6 +11,8 @@ export interface ElementDescriptor {
 /** React/Ember-style auto-generated ids (`:r1:`, `ember123`, `foo__bar-4821`). */
 const MACHINE_ID = /\d{3,}|^:|__/;
 const MAX_TEXT_LENGTH = 40;
+/** Script-ish hrefs (javascript:, data:, vbscript:) make junk selectors. */
+const SCRIPT_SCHEME = /^\s*(javascript|data|vbscript):/i;
 const MAX_PATH_DEPTH = 3;
 
 /**
@@ -41,12 +43,7 @@ const attributeCandidates = (el: Element): string[] => {
     candidates.push(`[data-testid="${escapeQuoted(testId)}"]`);
   }
   const href = el.getAttribute("href");
-  if (
-    el.tagName === "A" &&
-    href &&
-    href !== "#" &&
-    !href.startsWith("javascript:")
-  ) {
+  if (el.tagName === "A" && href && href !== "#" && !SCRIPT_SCHEME.test(href)) {
     candidates.push(`a[href="${escapeQuoted(href)}"]`);
   }
   const name = el.getAttribute("name");

@@ -22,21 +22,21 @@ const loginSession = (
     {
       kind: "input",
       selector: 'input[name="user"]',
-      value: "ref-u",
       sensitive: false,
+      value: "ref-u",
     },
     {
       kind: "input",
       selector: 'input[name="pass"]',
-      value: password,
       sensitive: true,
+      value: password,
     },
     { kind: "submit", selector: "#login-form" },
   ];
   return actions.map((action, i) => ({
-    ts: startTs + i * 1000,
-    origin,
     action,
+    origin,
+    ts: startTs + i * 1000,
   }));
 };
 
@@ -44,11 +44,11 @@ const patternFor = (
   session: RecordedEvent[],
   overrides: Partial<CandidatePattern> = {}
 ): CandidatePattern => ({
-  fingerprint: fingerprintSession(session),
-  origin: ORIGIN,
   count: 3,
-  steps: session.map((event) => event.action),
+  fingerprint: fingerprintSession(session),
   lastSeen: session.at(-1)?.ts ?? 0,
+  origin: ORIGIN,
+  steps: session.map((event) => event.action),
   ...overrides,
 });
 
@@ -56,19 +56,19 @@ describe("stampEvents", () => {
   const FRAME_URL = "https://widget.example.com/form?token=abc";
   const batch = (): RecordedEvent[] => [
     {
-      ts: 0,
-      origin: "https://widget.example.com",
       action: { kind: "navigate", url: FRAME_URL },
+      origin: "https://widget.example.com",
+      ts: 0,
     },
     {
-      ts: 1000,
-      origin: "https://widget.example.com",
       action: { kind: "click", selector: "#go" },
+      origin: "https://widget.example.com",
+      ts: 1000,
     },
   ];
 
   it("stamps top-frame batches with the tabId only", () => {
-    const stamped = stampEvents(batch(), { tabId: 7, frameId: 0 });
+    const stamped = stampEvents(batch(), { frameId: 0, tabId: 7 });
     expect(stamped).toHaveLength(2);
     expect(stamped[0]?.tabId).toBe(7);
     expect(stamped[0]?.origin).toBe("https://widget.example.com");
@@ -77,16 +77,16 @@ describe("stampEvents", () => {
 
   it("marks subframe actions with the frame URL and the tab's origin", () => {
     const stamped = stampEvents(batch(), {
-      tabId: 7,
       frameId: 42,
       frameUrl: FRAME_URL,
+      tabId: 7,
       tabUrl: `${ORIGIN}/checkout`,
     });
     // The subframe's navigate event is dropped: only the top frame narrates.
     expect(stamped.map((event) => event.action.kind)).toEqual(["click"]);
-    expect(stamped[0]?.tabId).toBe(7);
-    expect(stamped[0]?.origin).toBe(ORIGIN);
-    expect(stamped[0]?.action.frameUrl).toBe(FRAME_URL);
+    expect(stamped[0].tabId).toBe(7);
+    expect(stamped[0].origin).toBe(ORIGIN);
+    expect(stamped[0].action.frameUrl).toBe(FRAME_URL);
   });
 });
 
@@ -147,7 +147,7 @@ describe("mine", () => {
       ],
       {}
     );
-    const pattern = Object.values(patterns)[0];
+    const [pattern] = Object.values(patterns);
     expect(pattern?.count).toBe(2);
     const inputStep = pattern?.steps.find(
       (step) => step.kind === "input" && step.sensitive
@@ -176,14 +176,14 @@ describe("mine", () => {
     // fold into the same pattern.
     const logoutTail = (ts: number): RecordedEvent[] => [
       {
-        ts,
-        origin: ORIGIN,
         action: { kind: "navigate", url: `${ORIGIN}/secure` },
+        origin: ORIGIN,
+        ts,
       },
       {
-        ts: ts + 1000,
-        origin: ORIGIN,
         action: { kind: "click", selector: "#logout", text: "Logout" },
+        origin: ORIGIN,
+        ts: ts + 1000,
       },
     ];
     const patterns = mine(
@@ -206,8 +206,8 @@ describe("toWorkflowSteps", () => {
       {
         kind: "input",
         selector: 'input[name="user"]',
-        value: "r",
         sensitive: false,
+        value: "r",
       },
       { kind: "click", selector: "#login-button", text: "Login" },
       { kind: "submit", selector: "#login-form" },
@@ -230,10 +230,10 @@ describe("toWorkflowSteps", () => {
 
 describe("pendingSuggestions", () => {
   const base = {
-    suppressed: [],
-    workflows: [],
     minRepeats: 3,
     now: 1_000_000,
+    suppressed: [],
+    workflows: [],
   };
   const session = loginSession(0);
 
@@ -263,8 +263,8 @@ describe("pendingSuggestions", () => {
     expect(
       pendingSuggestions({
         ...base,
-        patterns: shown,
         now: base.now + SUGGEST_COOLDOWN_MS + 1,
+        patterns: shown,
       }).length
     ).toBe(1);
   });
@@ -296,11 +296,11 @@ describe("pendingSuggestions", () => {
         patterns: { [pattern.fingerprint]: pattern },
         workflows: [
           {
-            id: "w1",
-            origin: ORIGIN,
-            name: "Login",
             createdAt: 0,
             fingerprint: pattern.fingerprint,
+            id: "w1",
+            name: "Login",
+            origin: ORIGIN,
             steps: [],
           },
         ],

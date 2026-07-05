@@ -64,33 +64,41 @@ function App() {
     }
   }, [namingId, workflows]);
 
-  const record = async () => {
+  const record = useCallback(async () => {
     setRecordError(null);
     const started = await sendMessage("startRecording");
     if (!started) {
       setRecordError("Open the page you want to record first.");
     }
     refresh();
-  };
+  }, [refresh]);
 
-  const stopRecord = async () => {
+  const stopRecord = useCallback(async () => {
     // A stop with nothing recorded quietly discards, same as cancel.
     const workflow = await sendMessage("stopRecording");
     if (workflow) {
       setNamingId(workflow.id);
     }
     refresh();
-  };
+  }, [refresh]);
 
-  const startRecord = () => {
+  const startRecord = useCallback(() => {
     record().catch(() => null);
-  };
-  const stopAndSave = () => {
+  }, [record]);
+  const stopAndSave = useCallback(() => {
     stopRecord().catch(() => null);
-  };
-  const cancelRecord = () => {
+  }, [stopRecord]);
+  const cancelRecord = useCallback(() => {
     fireAndForget(sendMessage("cancelRecording"), refresh);
-  };
+  }, [refresh]);
+
+  const openSettings = useCallback(() => setView("settings"), []);
+  const showMain = useCallback(() => setView("main"), []);
+  const editWorkflow = useCallback((id: string) => setView({ edit: id }), []);
+  const finishOnboarding = useCallback(() => {
+    setView("main");
+    fireAndForget(setStored("onboarded", true), refresh);
+  }, [refresh]);
 
   if (vaultStatus === null || onboarded === null) {
     return null;
@@ -108,7 +116,7 @@ function App() {
               recording={recording !== null}
             />
           )}
-          <IconButton label="Settings" onClick={() => setView("settings")}>
+          <IconButton label="Settings" onClick={openSettings}>
             <Settings aria-hidden="true" className="size-4 shrink-0" />
           </IconButton>
         </div>
@@ -132,19 +140,19 @@ function App() {
         // to zero, then snap away when it unmounts.
         <div className="flex flex-col">
           <Expand show={recording !== null}>
-            {recording && (
+            {recording ? (
               <RecordingCard
                 onCancel={cancelRecord}
                 onStop={stopAndSave}
                 recording={recording}
               />
-            )}
+            ) : null}
           </Expand>
           <ErrorNotice className="-mt-3! mb-2" message={recordError} />
           <WorkflowList
             namingId={namingId}
             onChanged={refresh}
-            onEdit={(id) => setView({ edit: id })}
+            onEdit={editWorkflow}
             run={run}
             workflows={workflows}
           />
@@ -159,19 +167,12 @@ function App() {
     page = <LockScreen onUnlocked={refresh} />;
     pageKey = "locked";
   } else if (!onboarded) {
-    page = (
-      <Onboarding
-        onDone={() => {
-          setView("main");
-          fireAndForget(setStored("onboarded", true), refresh);
-        }}
-      />
-    );
+    page = <Onboarding onDone={finishOnboarding} />;
     pageKey = "onboarding";
   } else if (view === "settings") {
     page = (
       <SettingsView
-        onBack={() => setView("main")}
+        onBack={showMain}
         onChanged={refresh}
         status={vaultStatus}
       />
@@ -181,7 +182,7 @@ function App() {
     if (editing) {
       page = (
         <TimelineView
-          onBack={() => setView("main")}
+          onBack={showMain}
           onChanged={refresh}
           workflow={editing}
         />

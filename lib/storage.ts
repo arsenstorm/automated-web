@@ -22,7 +22,6 @@ const items: StorageItems = {
   run: storage.defineItem("local:run", { fallback: null }),
   settings: storage.defineItem("local:settings", {
     fallback: DEFAULT_SETTINGS,
-    version: 2,
     migrations: {
       // v1 predates recordSecrets; fill any missing fields with defaults.
       2: (old: Partial<Settings>): Settings => ({
@@ -30,6 +29,7 @@ const items: StorageItems = {
         ...old,
       }),
     },
+    version: 2,
   }),
   suppressed: storage.defineItem("local:suppressed", { fallback: [] }),
   vaultMeta: storage.defineItem("local:vaultMeta", { fallback: {} }),

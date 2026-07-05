@@ -8,10 +8,10 @@ import type { RunState, RunStatus } from "@/lib/types";
 import { useReducedMotion } from "./motion";
 
 const RUN_TONES: Record<RunStatus, BadgeTone> = {
-  running: "neutral",
-  paused: "attention",
   done: "positive",
   failed: "negative",
+  paused: "attention",
+  running: "neutral",
 };
 
 const FULL_WIDTH = 100;

@@ -22,7 +22,7 @@ const mountShadowButton = () => {
   const button = document.createElement("button");
   button.textContent = "Go";
   root.append(button);
-  return { host, root, button };
+  return { button, host, root };
 };
 
 describe("recording inside shadow roots", () => {
@@ -34,8 +34,8 @@ describe("recording inside shadow roots", () => {
     const { host, root, button } = mountShadowButton();
     // event.target is retargeted to the host; composedPath keeps the truth.
     onClick({
-      target: host,
       composedPath: () => [button, root, host, document.body, document],
+      target: host,
     } as unknown as MouseEvent);
     received = [];
     await flush();

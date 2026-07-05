@@ -37,28 +37,28 @@ describe("recorder redaction", () => {
     const [event] = await flushed();
     expect(event?.action).toMatchObject({
       kind: "input",
-      value: "",
       sensitive: true,
+      value: "",
     });
   });
 
   it("redacts by autocomplete (cc-number) too", async () => {
     changeValue('<input autocomplete="cc-number" name="card">', "4111");
     const [event] = await flushed();
-    expect(event?.action).toMatchObject({ value: "", sensitive: true });
+    expect(event?.action).toMatchObject({ sensitive: true, value: "" });
   });
 
   it("stores secret values when the user opts in", async () => {
     setRecordSecrets(true);
     changeValue('<input name="pw" type="password">', "hunter2");
     const [event] = await flushed();
-    expect(event?.action).toMatchObject({ value: "hunter2", sensitive: true });
+    expect(event?.action).toMatchObject({ sensitive: true, value: "hunter2" });
   });
 
   it("keeps ordinary input values", async () => {
     changeValue('<input name="email" type="email">', "a@b.c");
     const [event] = await flushed();
-    expect(event?.action).toMatchObject({ value: "a@b.c", sensitive: false });
+    expect(event?.action).toMatchObject({ sensitive: false, value: "a@b.c" });
   });
 });
 
@@ -73,8 +73,8 @@ describe("executor secret pause", () => {
     const result = await executeStep({
       kind: "input",
       selector: 'input[name="pw"]',
-      value: "",
       sensitive: true,
+      value: "",
     });
     expect(result).toMatchObject({ ok: false, reason: "secret" });
     expect(el.value).toBe("");
@@ -87,8 +87,8 @@ describe("executor secret pause", () => {
     const result = await executeStep({
       kind: "input",
       selector: 'input[name="pw"]',
-      value: "hunter2",
       sensitive: true,
+      value: "hunter2",
     });
     expect(result).toEqual({ ok: true });
     expect(el.value).toBe("hunter2");
@@ -100,8 +100,8 @@ describe("executor secret pause", () => {
     const result = await executeStep({
       kind: "input",
       selector: 'input[name="email"]',
-      value: "a@b.c",
       sensitive: false,
+      value: "a@b.c",
     });
     expect(result).toEqual({ ok: true });
     expect(el.value).toBe("a@b.c");

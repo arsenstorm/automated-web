@@ -8,10 +8,10 @@ import type { RunState, StepResult } from "./types";
 export function startedRun(workflowId: string, tabId: number): RunState {
   return {
     id: crypto.randomUUID(),
-    workflowId,
-    tabId,
-    stepIndex: 0,
     status: "running",
+    stepIndex: 0,
+    tabId,
+    workflowId,
   };
 }
 
@@ -23,25 +23,25 @@ export function afterStep(
   if (!result.ok) {
     return {
       ...run,
-      status: "paused",
       pausedReason: result.detail
         ? `${result.reason}: ${result.detail}`
         : result.reason,
+      status: "paused",
     };
   }
   const stepIndex = run.stepIndex + 1;
   if (stepIndex >= totalSteps) {
-    return { ...run, stepIndex, status: "done", pausedReason: undefined };
+    return { ...run, pausedReason: undefined, status: "done", stepIndex };
   }
-  return { ...run, stepIndex, status: "running", pausedReason: undefined };
+  return { ...run, pausedReason: undefined, status: "running", stepIndex };
 }
 
 export function pausedRun(run: RunState, reason: string): RunState {
-  return { ...run, status: "paused", pausedReason: reason };
+  return { ...run, pausedReason: reason, status: "paused" };
 }
 
 export function resumedRun(run: RunState): RunState {
-  return { ...run, status: "running", pausedReason: undefined };
+  return { ...run, pausedReason: undefined, status: "running" };
 }
 
 /**

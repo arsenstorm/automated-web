@@ -1,7 +1,7 @@
 /** Header record control: plus → red recording dot → stop glyph on hover. */
 
 import { Circle, Plus, Square } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { IconButton } from "@/components/buttons";
 import { IconSwap } from "@/components/transitions";
 
@@ -15,6 +15,8 @@ export function RecordButton({
   onStop: () => void;
 }) {
   const [hover, setHover] = useState(false);
+  const hoverOn = useCallback(() => setHover(true), []);
+  const hoverOff = useCallback(() => setHover(false), []);
 
   let key = "plus";
   let icon = <Plus aria-hidden="true" className="size-4 shrink-0" />;
@@ -33,11 +35,11 @@ export function RecordButton({
   return (
     <IconButton
       label={recording ? "Stop recording and save" : "Record a workflow"}
-      onBlur={() => setHover(false)}
+      onBlur={hoverOff}
       onClick={recording ? onStop : onStart}
-      onFocus={() => setHover(true)}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      onFocus={hoverOn}
+      onMouseEnter={hoverOn}
+      onMouseLeave={hoverOff}
       variant={recording ? "destructive" : "primary"}
     >
       <IconSwap id={key}>{icon}</IconSwap>

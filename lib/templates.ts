@@ -18,8 +18,8 @@ const substitute = (
 ): { text: string; missing: string[] } => {
   const missing = tokenRefs(text).filter((id) => outputs[id] === undefined);
   return {
-    text: text.replace(TOKEN, (token, id: string) => outputs[id] ?? token),
     missing,
+    text: text.replace(TOKEN, (token, id: string) => outputs[id] ?? token),
   };
 };
 

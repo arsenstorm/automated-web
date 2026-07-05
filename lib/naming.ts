@@ -5,13 +5,8 @@ import type { StepAction } from "./types";
 const SEARCH_FIELD = /search|\bq\b/i;
 const MAX_NAME_TEXT = 30;
 
-export const hostOfUrl = (url: string): string | undefined => {
-  try {
-    return new URL(url).host;
-  } catch {
-    return;
-  }
-};
+export const hostOfUrl = (url: string): string | undefined =>
+  URL.canParse(url) ? new URL(url).host : undefined;
 
 const HREF_SELECTOR = /^a\[href="([^"]+)"\]/;
 
@@ -33,7 +28,6 @@ const landingHost = (actions: StepAction[]): string | undefined => {
       }
     }
   }
-  return;
 };
 
 /**
@@ -92,9 +86,7 @@ export function describeStep(step: StepAction): string {
       return `Wait ${step.ms / MS_PER_SECOND}s`;
     case "pause":
       return "Pause for me";
-    case "extract":
-      return `Extract text from ${step.selector}`;
     default:
-      return "Step";
+      return `Extract text from ${step.selector}`;
   }
 }

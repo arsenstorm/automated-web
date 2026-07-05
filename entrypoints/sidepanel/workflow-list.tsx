@@ -46,7 +46,7 @@ export function WorkflowList({
                 key={workflow.id}
                 namingId={namingId}
                 onChanged={onChanged}
-                onEdit={() => onEdit(workflow.id)}
+                onEdit={onEdit}
                 run={run}
                 workflow={workflow}
               />

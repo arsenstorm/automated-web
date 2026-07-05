@@ -45,9 +45,9 @@ export default defineBackground(() => {
     const events = await getSecure("events");
     events.push(
       ...stampEvents(data, {
-        tabId: sender.tab?.id,
         frameId: sender.frameId,
         frameUrl: sender.url,
+        tabId: sender.tab?.id,
         tabUrl: sender.tab?.url,
       })
     );

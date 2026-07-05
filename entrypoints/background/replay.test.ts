@@ -23,21 +23,21 @@ const sendMessageMock = vi.mocked(sendMessage);
 const CLICK = { kind: "click", selector: "#go" } as const;
 const NAV = { kind: "navigate", url: "https://example.com/" } as const;
 const THREE_STEPS: Workflow = {
+  createdAt: 0,
+  fingerprint: "fp",
   id: "wf-1",
   name: "Test flow",
   origin: "https://example.com",
-  fingerprint: "fp",
-  createdAt: 0,
   steps: [{ kind: "navigate", url: "https://example.com/" }, CLICK, CLICK],
 };
 
 const pausedRun = (tabId: number, stepIndex: number): RunState => ({
   id: "run-1",
-  workflowId: "wf-1",
-  tabId,
-  stepIndex,
-  status: "paused",
   pausedReason: "captcha",
+  status: "paused",
+  stepIndex,
+  tabId,
+  workflowId: "wf-1",
 });
 
 const liveTabId = async (): Promise<number> => {
@@ -60,8 +60,8 @@ describe("replay orchestration", () => {
   it("pauses a running run after a service-worker restart", async () => {
     await setStored("run", {
       ...pausedRun(1, 1),
-      status: "running",
       pausedReason: undefined,
+      status: "running",
     });
     await pauseInterruptedRun();
     const run = await getStored("run");
@@ -160,7 +160,7 @@ describe("replay orchestration", () => {
 
   it("captures extract output and substitutes it into a later input", async () => {
     sendMessageMock.mockImplementation((_name, data) => {
-      const step = (data as { step: { kind: string } }).step;
+      const { step } = data as { step: { kind: string } };
       return Promise.resolve(
         step.kind === "extract" ? { ok: true, output: "$5" } : { ok: true }
       ) as never;
@@ -175,8 +175,8 @@ describe("replay orchestration", () => {
             id: "s3",
             kind: "input",
             selector: "#note",
-            value: "was {{s2}}",
             sensitive: false,
+            value: "was {{s2}}",
           },
         ],
       },
@@ -188,7 +188,7 @@ describe("replay orchestration", () => {
     expect(run?.outputs).toEqual({ s2: "$5" });
     const inputCall = sendMessageMock.mock.calls.find(
       ([, data]) =>
-        (data as { step?: { kind?: string } })?.step?.kind === "input"
+        (data as { step?: { kind?: string } }).step?.kind === "input"
     );
     expect((inputCall?.[1] as { step: { value: string } }).step.value).toBe(
       "was $5"
@@ -202,7 +202,7 @@ describe("replay orchestration", () => {
     const call = sendMessageMock.mock.calls.find(
       ([name]) => name === "executeStep"
     );
-    expect(call?.[2]).toEqual({ tabId, frameId: 0 });
+    expect(call?.[2]).toEqual({ frameId: 0, tabId });
   });
 
   it("dispatches an iframe step to its matching frame", async () => {
@@ -229,7 +229,7 @@ describe("replay orchestration", () => {
     const call = sendMessageMock.mock.calls.find(
       ([name]) => name === "executeStep"
     );
-    expect(call?.[2]).toEqual({ tabId, frameId: 5 });
+    expect(call?.[2]).toEqual({ frameId: 5, tabId });
   });
 
   it("pauses when the step's frame is gone", async () => {
@@ -263,8 +263,8 @@ describe("replay orchestration", () => {
             id: "s2",
             kind: "input",
             selector: "#note",
-            value: "{{s9}}",
             sensitive: false,
+            value: "{{s9}}",
           },
         ],
       },

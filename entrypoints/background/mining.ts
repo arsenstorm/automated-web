@@ -53,15 +53,16 @@ export const runMiner = async () => {
   }
   // Pending suggestions retry every tick until the user is on that origin.
   const due = pendingSuggestions({
+    minRepeats: settings.minRepeats,
+    now: Date.now(),
     patterns: next,
     suppressed,
     workflows,
-    minRepeats: settings.minRepeats,
-    now: Date.now(),
   });
   for (const pattern of due) {
     // Count what the saved workflow will show: real steps, no leading navigate.
     const steps = toWorkflowSteps(pattern.steps);
+    // biome-ignore lint/performance/noAwaitInLoops: suggestions target the single active tab one at a time, and each shown one is persisted before the next.
     const shown = await suggestToActiveTab(
       pattern.origin,
       pattern.fingerprint,
@@ -86,8 +87,8 @@ export const saveSuggestion = async (fingerprint: string) => {
   const workflows = await getSecure("workflows");
   const workflow = buildWorkflow({
     actions: pattern.steps,
-    startUrl: pattern.origin,
     fingerprint,
+    startUrl: pattern.origin,
   });
   workflows.push(workflow);
   delete patterns[fingerprint];

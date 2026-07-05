@@ -5,22 +5,60 @@
  * editor; `{{sN}}` tokens in input values / navigate URLs reference the
  * output of the step with that id. Recorded-but-never-edited steps have none.
  */
-export type StepAction = {
-  id?: string;
+interface StepBase {
   /**
    * Element lives in an iframe: that frame's URL at record time. Stamped by
    * the background from the message sender; not user-editable.
    */
   frameUrl?: string;
-} & (
-  | { kind: "navigate"; url: string }
-  | { kind: "click"; selector: string; text?: string }
-  | { kind: "input"; selector: string; value: string; sensitive: boolean }
-  | { kind: "submit"; selector: string }
-  | { kind: "sleep"; ms: number }
-  | { kind: "pause" }
-  | { kind: "extract"; selector: string }
-);
+  id?: string;
+}
+
+interface NavigateStep extends StepBase {
+  kind: "navigate";
+  url: string;
+}
+
+interface ClickStep extends StepBase {
+  kind: "click";
+  selector: string;
+  text?: string;
+}
+
+interface InputStep extends StepBase {
+  kind: "input";
+  selector: string;
+  sensitive: boolean;
+  value: string;
+}
+
+interface SubmitStep extends StepBase {
+  kind: "submit";
+  selector: string;
+}
+
+interface SleepStep extends StepBase {
+  kind: "sleep";
+  ms: number;
+}
+
+interface PauseStep extends StepBase {
+  kind: "pause";
+}
+
+interface ExtractStep extends StepBase {
+  kind: "extract";
+  selector: string;
+}
+
+export type StepAction =
+  | NavigateStep
+  | ClickStep
+  | InputStep
+  | SubmitStep
+  | SleepStep
+  | PauseStep
+  | ExtractStep;
 
 export interface RecordedEvent {
   action: StepAction;
