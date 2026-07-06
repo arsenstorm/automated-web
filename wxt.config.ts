@@ -17,6 +17,7 @@ export default defineConfig({
       "alarms", // periodic pattern mining while the service worker sleeps
       "storage", // workflows/events/patterns (encrypted) + settings
       "notifications", // "workflow stuck / finished" alerts
+      "scripting", // inject the recorder into tabs already open at install
       "sidePanel", // the UI lives in the side panel
       "webNavigation", // maps recorded frame URLs to live frameIds at replay
     ],

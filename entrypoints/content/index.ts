@@ -63,10 +63,11 @@ export default defineContentScript({
     onMessage("executeStep", ({ data }) => executeStep(data.step));
     onMessage("flushNow", () => flush());
   },
-  // Firefox doesn't support matchOriginAsFallback; Chrome needs it to
-  // inject into opaque-origin frames (sandboxed srcdoc without
-  // allow-same-origin) that matchAboutBlank can't reach.
-  matchAboutBlank: true,
+  // Chrome rejects a content script declaring both matchAboutBlank and
+  // matchOriginAsFallback, and matchOriginAsFallback covers about:blank plus
+  // opaque-origin frames (sandboxed srcdoc). Firefox doesn't support
+  // matchOriginAsFallback, so it gets matchAboutBlank instead.
+  matchAboutBlank: import.meta.env.FIREFOX || undefined,
   matches: ["<all_urls>"],
-  matchOriginAsFallback: true,
+  matchOriginAsFallback: !import.meta.env.FIREFOX || undefined,
 });

@@ -26,6 +26,27 @@ export default defineBackground(() => {
     ?.setPanelBehavior({ openPanelOnActionClick: true })
     .catch((error) => console.error(error));
 
+  // Chrome only injects manifest content scripts into pages loaded after the
+  // extension is installed; without this, tabs already open at install time
+  // silently record nothing until reloaded.
+  browser.runtime.onInstalled.addListener(async () => {
+    const tabs = await browser.tabs.query({
+      url: ["http://*/*", "https://*/*"],
+    });
+    await Promise.all(
+      tabs.map((tab) =>
+        tab.id === undefined
+          ? null
+          : browser.scripting
+              .executeScript({
+                files: ["/content-scripts/content.js"],
+                target: { allFrames: true, tabId: tab.id },
+              })
+              .catch(() => null)
+      )
+    );
+  });
+
   browser.alarms.create(MINE_ALARM, { periodInMinutes: MINE_PERIOD_MINUTES });
   browser.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === MINE_ALARM) {
