@@ -3,6 +3,7 @@
 import { sendMessage } from "@/lib/messaging";
 import { fingerprintSession, toWorkflowSteps } from "@/lib/miner";
 import { getStored, setStored } from "@/lib/storage";
+import { advanceTourAfterRecord } from "@/lib/tour";
 import type { Workflow } from "@/lib/types";
 import { buildWorkflow } from "@/lib/workflow";
 import { getSecure, setSecure } from "./vault";
@@ -23,26 +24,33 @@ export const startRecording = async (): Promise<boolean> => {
   return true;
 };
 
+/**
+ * Pull whatever the tab still has buffered into stored events. Per frame: a
+ * tab-wide broadcast resolves on the first frame's response, which wouldn't
+ * guarantee iframe buffers landed.
+ */
+export const flushTabBuffers = async (tabId: number): Promise<void> => {
+  // Promise.resolve wrapper: fake-browser's getAllFrames throws synchronously.
+  const frames = (await Promise.resolve()
+    .then(() => browser.webNavigation.getAllFrames({ tabId }))
+    .catch(() => null)) ?? [{ frameId: 0 }];
+  await Promise.all(
+    frames.map((frame) =>
+      sendMessage("flushNow", undefined, {
+        frameId: frame.frameId,
+        tabId,
+      }).catch(() => null)
+    )
+  );
+};
+
 export const stopRecording = async (): Promise<Workflow | null> => {
   const recording = await getStored("recording");
   if (!recording) {
     return null;
   }
   await setStored("recording", null);
-  // Pull whatever the tab still has buffered before cutting the workflow.
-  // Per frame: a tab-wide broadcast resolves on the first frame's response,
-  // which wouldn't guarantee iframe buffers landed.
-  const frames = (await browser.webNavigation
-    .getAllFrames({ tabId: recording.tabId })
-    .catch(() => null)) ?? [{ frameId: 0 }];
-  await Promise.all(
-    frames.map((frame) =>
-      sendMessage("flushNow", undefined, {
-        frameId: frame.frameId,
-        tabId: recording.tabId,
-      }).catch(() => null)
-    )
-  );
+  await flushTabBuffers(recording.tabId);
   const events = (await getSecure("events")).filter(
     (event) =>
       event.tabId === recording.tabId && event.ts >= recording.startedAt
@@ -60,5 +68,6 @@ export const stopRecording = async (): Promise<Workflow | null> => {
   });
   workflows.push(workflow);
   await setSecure("workflows", workflows);
+  await advanceTourAfterRecord(workflow);
   return workflow;
 };

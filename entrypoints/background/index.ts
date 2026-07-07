@@ -5,7 +5,12 @@ import { EVENT_BUFFER_CAP } from "@/lib/types";
 import { validateSteps } from "@/lib/workflow";
 import { dismissSuggestion, runMiner, saveSuggestion } from "./mining";
 import { startRecording, stopRecording } from "./recording";
-import { continueRun, pauseInterruptedRun, startRun } from "./replay";
+import {
+  continueRun,
+  maybeAutoResume,
+  pauseInterruptedRun,
+  startRun,
+} from "./replay";
 import {
   getSecure,
   lockVault,
@@ -73,6 +78,8 @@ export default defineBackground(() => {
       })
     );
     await setSecure("events", events.slice(-EVENT_BUFFER_CAP));
+    // Self-healing: these events may be the manual steps a paused run waits on.
+    fireAndForget(maybeAutoResume(sender.tab?.id));
   });
   onMessage("startRecording", () => startRecording());
   onMessage("stopRecording", () => stopRecording());
@@ -83,16 +90,24 @@ export default defineBackground(() => {
     dismissSuggestion(data.fingerprint, data.never)
   );
   onMessage("listWorkflows", () => getSecure("workflows"));
-  onMessage("deleteWorkflow", async ({ data }) => {
-    const workflows = await getSecure("workflows");
-    await setSecure(
-      "workflows",
-      workflows.filter((workflow) => workflow.id !== data)
-    );
-    const run = await getStored("run");
-    if (run?.workflowId === data) {
-      await setStored("run", null);
-    }
+  let pendingDelete: Promise<void> = Promise.resolve();
+  onMessage("deleteWorkflow", ({ data }) => {
+    // Serialized: concurrent deletes would each read-modify-write the same
+    // list and the last write would win, silently undoing the others.
+    pendingDelete = pendingDelete
+      .catch(() => undefined)
+      .then(async () => {
+        const workflows = await getSecure("workflows");
+        await setSecure(
+          "workflows",
+          workflows.filter((workflow) => workflow.id !== data)
+        );
+        const run = await getStored("run");
+        if (run?.workflowId === data) {
+          await setStored("run", null);
+        }
+      });
+    return pendingDelete;
   });
   onMessage("updateWorkflowSteps", async ({ data }) => {
     const run = await getStored("run");

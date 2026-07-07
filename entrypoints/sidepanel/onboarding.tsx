@@ -13,6 +13,8 @@ import { StepCard } from "@/components/step-card";
 import { GHOST_TEXT_BUTTON, INPUT, PRIMARY_BUTTON } from "@/components/styles";
 import { IconSwap, StepFlow } from "@/components/transitions";
 import { sendMessage } from "@/lib/messaging";
+import { setStored } from "@/lib/storage";
+import { TOUR_URL } from "@/lib/tour";
 
 type Step = "welcome" | "vault" | "password" | "done";
 
@@ -43,10 +45,17 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
     []
   );
 
+  const startTour = useCallback(() => {
+    setStored("tour", { phase: "record", step: 0 })
+      .then(() => browser.tabs.create({ url: TOUR_URL }))
+      .catch(() => null);
+    onDone();
+  }, [onDone]);
+
   const steps: Record<Step, ReactNode> = {
     done: (
       <StepCard
-        description="Record your first workflow whenever you're ready. You can change vault settings at any time."
+        description="Take a two-minute guided tour: record and replay real demo flows on a live page, or jump straight in."
         icon={
           <CircleCheck
             aria-hidden="true"
@@ -57,10 +66,17 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
       >
         <button
           className={cn(PRIMARY_BUTTON, "mt-4")}
+          onClick={startTour}
+          type="button"
+        >
+          Try it on a demo page
+        </button>
+        <button
+          className={cn(GHOST_TEXT_BUTTON, "mt-1")}
           onClick={onDone}
           type="button"
         >
-          Start using Automated Web
+          Skip the tour
         </button>
       </StepCard>
     ),

@@ -11,6 +11,7 @@ import {
   setRecordSecrets,
 } from "./recorder";
 import { showToast } from "./toast";
+import { mountTour } from "./tour";
 
 const FLUSH_INTERVAL_MS = 5000;
 
@@ -34,6 +35,11 @@ export default defineContentScript({
     // Only the top frame narrates navigation — subframe navigate events
     // would split miner sessions on iframe origins.
     if (isTop) {
+      // Let pages detect the extension (e.g. the writeup's demo tour).
+      document.documentElement.dataset.automatedWeb =
+        browser.runtime.getManifest().version;
+      window.dispatchEvent(new CustomEvent("automated-web:ready"));
+      mountTour();
       record({ kind: "navigate", url: location.href });
       // Back/forward can restore from bfcache or move SPA history without
       // re-running main(); record those navigations too.

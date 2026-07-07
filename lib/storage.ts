@@ -28,10 +28,16 @@ const items: StorageItems = {
         ...DEFAULT_SETTINGS,
         ...old,
       }),
+      // v2 predates autoResume.
+      3: (old: Partial<Settings>): Settings => ({
+        ...DEFAULT_SETTINGS,
+        ...old,
+      }),
     },
-    version: 2,
+    version: 3,
   }),
   suppressed: storage.defineItem("local:suppressed", { fallback: [] }),
+  tour: storage.defineItem("local:tour", { fallback: null }),
   vaultMeta: storage.defineItem("local:vaultMeta", { fallback: {} }),
   workflows: storage.defineItem("local:workflows", { fallback: null }),
 };

@@ -49,30 +49,53 @@ function RecordingSettings() {
     fireAndForget(getStored("settings").then(setSettings));
   }, []);
 
-  const setRecordSecrets = useCallback(
-    (recordSecrets: boolean) => {
+  const update = useCallback(
+    (patch: Partial<Settings>) => {
       if (!settings) {
         return;
       }
-      const next = { ...settings, recordSecrets };
+      const next = { ...settings, ...patch };
       setSettings(next);
       setStored("settings", next).catch(() => null);
     },
     [settings]
   );
 
+  const setRecordSecrets = useCallback(
+    (recordSecrets: boolean) => update({ recordSecrets }),
+    [update]
+  );
+
+  const setAutoResume = useCallback(
+    (autoResume: boolean) => update({ autoResume }),
+    [update]
+  );
+
   return (
-    <SettingRow
-      description="Keep passwords and card numbers in the encrypted vault so replay can fill them."
-      label="Store secret fields"
-    >
-      <Switch
-        checked={settings?.recordSecrets ?? false}
-        disabled={settings === null}
+    <section className="flex flex-col gap-4">
+      <SettingRow
+        description="Keep passwords and card numbers in the encrypted vault so replay can fill them."
         label="Store secret fields"
-        onChange={setRecordSecrets}
-      />
-    </SettingRow>
+      >
+        <Switch
+          checked={settings?.recordSecrets ?? false}
+          disabled={settings === null}
+          label="Store secret fields"
+          onChange={setRecordSecrets}
+        />
+      </SettingRow>
+      <SettingRow
+        description="When a paused workflow's steps are done by hand (like entering a password and submitting), continue it from there."
+        label="Automatically resume after pauses"
+      >
+        <Switch
+          checked={settings?.autoResume ?? false}
+          disabled={settings === null}
+          label="Automatically resume after pauses"
+          onChange={setAutoResume}
+        />
+      </SettingRow>
+    </section>
   );
 }
 

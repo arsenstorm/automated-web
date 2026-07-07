@@ -4,14 +4,19 @@ import { sendMessage } from "@/lib/messaging";
 import { notify, notifyStuck } from "@/lib/notify";
 import {
   afterStep,
+  healedStepIndex,
   pausedRun,
   resumedRun,
+  samePathname,
+  sameUrl,
   startedRun,
 } from "@/lib/replay-state";
 import { getStored, setStored } from "@/lib/storage";
 import { resolveStep } from "@/lib/templates";
+import { advanceTourAfterReplay } from "@/lib/tour";
 import type { RunState, StepResult, Workflow } from "@/lib/types";
 import { MAX_SLEEP_MS } from "@/lib/workflow";
+import { flushTabBuffers } from "./recording";
 import { getSecure, vaultLocked } from "./vault";
 
 const TAB_LOAD_TIMEOUT_MS = 30_000;
@@ -86,44 +91,6 @@ const keepAliveSleep = async (ms: number) => {
     await sleep(chunk);
     remaining -= chunk;
     await browser.storage.local.get("run");
-  }
-};
-
-const TRAILING_SLASH = /\/$/;
-
-// ponytail: hash- and trailing-slash-insensitive exact match; add query
-// normalization if reuse misses.
-const sameUrl = (a: string | undefined, b: string): boolean => {
-  try {
-    if (a === undefined) {
-      return false;
-    }
-    const urlA = new URL(a);
-    const urlB = new URL(b);
-    urlA.hash = "";
-    urlB.hash = "";
-    urlA.pathname = urlA.pathname.replace(TRAILING_SLASH, "");
-    urlB.pathname = urlB.pathname.replace(TRAILING_SLASH, "");
-    return urlA.href === urlB.href;
-  } catch {
-    return false;
-  }
-};
-
-const samePathname = (a: string | undefined, b: string): boolean => {
-  try {
-    if (a === undefined) {
-      return false;
-    }
-    const urlA = new URL(a);
-    const urlB = new URL(b);
-    return (
-      urlA.origin === urlB.origin &&
-      urlA.pathname.replace(TRAILING_SLASH, "") ===
-        urlB.pathname.replace(TRAILING_SLASH, "")
-    );
-  } catch {
-    return false;
   }
 };
 
@@ -238,6 +205,7 @@ const runLoop = async () => {
   }
   if (run.status === "done") {
     await notify("Workflow finished", workflow.name);
+    await advanceTourAfterReplay(workflow.id);
   }
 };
 
@@ -301,15 +269,72 @@ export const continueRun = async ({ skip }: { skip: boolean }) => {
     skip ||
     workflow.steps[run.stepIndex]?.kind === "pause" ||
     (run.pausedReason?.startsWith("secret") ?? false);
-  const next = advance
+  let next = advance
     ? afterStep(resumedRun(run), { ok: true }, workflow.steps.length)
     : resumedRun(run);
+  // Self-healing: skip steps the user already performed by hand while paused
+  // (e.g. entered the password and hit submit instead of resuming).
+  const { pausedAt } = run;
+  if (next.status === "running" && pausedAt !== undefined) {
+    await flushTabBuffers(run.tabId);
+    const userActions = (await getSecure("events"))
+      .filter((event) => event.tabId === run.tabId && event.ts >= pausedAt)
+      .map((event) => event.action);
+    const stepIndex = healedStepIndex(
+      next.stepIndex,
+      workflow.steps,
+      userActions
+    );
+    next =
+      stepIndex >= workflow.steps.length
+        ? { ...next, status: "done", stepIndex }
+        : { ...next, stepIndex };
+  }
   await setStored("run", next);
   if (next.status === "done") {
     await notify("Workflow finished", workflow.name);
+    await advanceTourAfterReplay(workflow.id);
     return;
   }
   await runLoop();
+};
+
+/**
+ * Auto-resume (opt-in via settings): called when the paused run's tab flushes
+ * recorded events. Resumes once the user has moved PAST the blocking step —
+ * for a password pause that means typed AND submitted; resuming on the input
+ * alone would submit a form the user may still be filling.
+ */
+export const maybeAutoResume = async (tabId: number | undefined) => {
+  const { autoResume } = await getStored("settings");
+  if (!autoResume || tabId === undefined) {
+    return;
+  }
+  const run = await getStored("run");
+  if (run?.status !== "paused" || run.tabId !== tabId) {
+    return;
+  }
+  const { pausedAt } = run;
+  const reason = run.pausedReason ?? "";
+  const waitingOnUser =
+    reason.startsWith("pause") || reason.startsWith("secret");
+  if (pausedAt === undefined || !waitingOnUser) {
+    return;
+  }
+  const workflows = await getSecure("workflows");
+  const workflow = workflows.find((w) => w.id === run.workflowId);
+  if (!workflow) {
+    return;
+  }
+  const userActions = (await getSecure("events"))
+    .filter((event) => event.tabId === tabId && event.ts >= pausedAt)
+    .map((event) => event.action);
+  // continueRun's advance already skips the blocking step; require evidence
+  // the user completed at least the step after it.
+  const base = run.stepIndex + 1;
+  if (healedStepIndex(base, workflow.steps, userActions) > base) {
+    await continueRun({ skip: false });
+  }
 };
 
 /** SW restarted mid-run: pause rather than risk double-executing a step. */

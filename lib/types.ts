@@ -95,6 +95,8 @@ export interface RunState {
    * hold secrets.
    */
   outputs?: Record<string, string>;
+  /** When the run paused; user events after this feed resume self-healing. */
+  pausedAt?: number;
   pausedReason?: string;
   status: RunStatus;
   /** Next step to execute. */
@@ -139,15 +141,29 @@ export interface CandidatePattern {
 }
 
 export interface Settings {
+  /** Resume a paused run once the user performs the steps it waited on. */
+  autoResume: boolean;
   minRepeats: number;
   /** Store secret-field values (encrypted) so replay can fill them. */
   recordSecrets: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
+  autoResume: false,
   minRepeats: 3,
   recordSecrets: false,
 };
+
+/** Guided onboarding tour progress (see lib/tour.ts). */
+export interface TourState {
+  phase: "record" | "replay" | "done";
+  /** Index into DEMOS. */
+  step: number;
+  /** Workflow to replay, set once the record phase completes. */
+  workflowId?: string;
+  /** Every workflow recorded during the tour, offered for cleanup at the end. */
+  workflowIds?: string[];
+}
 
 export const EVENT_BUFFER_CAP = 1000;
 
@@ -169,6 +185,8 @@ export interface StorageShape {
   settings: Settings;
   /** Dismissed fingerprints and `never:<origin>` entries. */
   suppressed: string[];
+  /** Guided demo tour progress; null when no tour is active. */
+  tour: TourState | null;
   vaultMeta: VaultMeta;
   workflows: VaultEntry | null;
 }

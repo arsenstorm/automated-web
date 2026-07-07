@@ -4,6 +4,7 @@ import { sendMessage } from "@/lib/messaging";
 import { describeElement } from "@/lib/selector";
 import type { RecordedEvent, StepAction } from "@/lib/types";
 import { isInToast } from "./toast";
+import { isInTour } from "./tour";
 
 const ACTIONABLE = 'button, a, [role="button"], input[type="submit"], label';
 const SENSITIVE_AUTOCOMPLETE = /password|cc-/;
@@ -62,7 +63,8 @@ export const onClick = (event: MouseEvent) => {
   if (
     recordingSuppressed() ||
     !(target instanceof Element) ||
-    isInToast(target)
+    isInToast(target) ||
+    isInTour(target)
   ) {
     return;
   }

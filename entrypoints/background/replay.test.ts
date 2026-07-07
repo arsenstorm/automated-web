@@ -10,8 +10,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fakeBrowser } from "wxt/testing";
 import { sendMessage } from "@/lib/messaging";
 import { getStored, setStored } from "@/lib/storage";
-import type { RunState, Workflow } from "@/lib/types";
-import { continueRun, pauseInterruptedRun } from "./replay";
+import {
+  DEFAULT_SETTINGS,
+  type RecordedEvent,
+  type RunState,
+  type Workflow,
+} from "@/lib/types";
+import { continueRun, maybeAutoResume, pauseInterruptedRun } from "./replay";
 import { setSecure } from "./vault";
 
 vi.mock("@/lib/messaging", async (importOriginal) => ({
@@ -251,6 +256,70 @@ describe("replay orchestration", () => {
     const run = await getStored("run");
     expect(run?.status).toBe("paused");
     expect(run?.pausedReason).toContain("frame not found");
+  });
+
+  describe("maybeAutoResume", () => {
+    const PASSWORD = {
+      kind: "input",
+      selector: "#pw",
+      sensitive: true,
+      value: "",
+    } as const;
+    const SUBMIT = { kind: "submit", selector: "form" } as const;
+    const LOGIN_FLOW: Workflow = {
+      ...THREE_STEPS,
+      steps: [NAV, PASSWORD, SUBMIT, CLICK],
+    };
+    const userEvent = (
+      action: RecordedEvent["action"],
+      tabId: number
+    ): RecordedEvent => ({
+      action,
+      origin: "https://example.com",
+      tabId,
+      ts: 200,
+    });
+    const secretPause = (tabId: number): RunState => ({
+      ...pausedRun(tabId, 1),
+      pausedAt: 100,
+      pausedReason: "secret: no stored value",
+    });
+
+    it("resumes once the user typed the password and submitted", async () => {
+      await setSecure("workflows", [LOGIN_FLOW]);
+      await setStored("settings", { ...DEFAULT_SETTINGS, autoResume: true });
+      const tabId = await liveTabId();
+      await setStored("run", secretPause(tabId));
+      await setSecure("events", [
+        userEvent(PASSWORD, tabId),
+        userEvent(SUBMIT, tabId),
+      ]);
+      await maybeAutoResume(tabId);
+      const run = await getStored("run");
+      expect(run?.status).toBe("done");
+    });
+
+    it("stays paused on the password input alone (no submit yet)", async () => {
+      await setSecure("workflows", [LOGIN_FLOW]);
+      await setStored("settings", { ...DEFAULT_SETTINGS, autoResume: true });
+      const tabId = await liveTabId();
+      await setStored("run", secretPause(tabId));
+      await setSecure("events", [userEvent(PASSWORD, tabId)]);
+      await maybeAutoResume(tabId);
+      expect((await getStored("run"))?.status).toBe("paused");
+    });
+
+    it("does nothing when the setting is off", async () => {
+      await setSecure("workflows", [LOGIN_FLOW]);
+      const tabId = await liveTabId();
+      await setStored("run", secretPause(tabId));
+      await setSecure("events", [
+        userEvent(PASSWORD, tabId),
+        userEvent(SUBMIT, tabId),
+      ]);
+      await maybeAutoResume(tabId);
+      expect((await getStored("run"))?.status).toBe("paused");
+    });
   });
 
   it("pauses with missing-output when a token has no value yet", async () => {

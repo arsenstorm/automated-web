@@ -41,7 +41,9 @@ const setNativeValue = (el: Element, value: string) => {
 };
 
 const applyStep = (el: Element, step: StepAction) => {
-  el.scrollIntoView({ block: "center" });
+  // "nearest": no scroll at all when the element is already visible — a
+  // centering scroll here shifts the page under the tour's spotlight.
+  el.scrollIntoView({ block: "nearest" });
   if (step.kind === "input") {
     if (el instanceof HTMLElement) {
       el.focus();
@@ -94,7 +96,7 @@ export const executeStep = async (step: StepAction): Promise<StepResult> => {
   // A secret with no stored value (the default — storing them is opt-in):
   // focus the field and pause for the user to type it, then skip the step.
   if (step.kind === "input" && step.sensitive && !step.value) {
-    el.scrollIntoView({ block: "center" });
+    el.scrollIntoView({ block: "nearest" });
     if (el instanceof HTMLElement) {
       el.focus();
     }
