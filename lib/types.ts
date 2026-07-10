@@ -12,6 +12,8 @@ interface StepBase {
    */
   frameUrl?: string;
   id?: string;
+  /** Tab ordinal: 0/omitted = the start tab; 1, 2, … = other tabs in first-use order. */
+  tab?: number;
 }
 
 interface NavigateStep extends StepBase {
@@ -51,6 +53,20 @@ interface ExtractStep extends StepBase {
   selector: string;
 }
 
+/** Close this step's tab (recorded when the user closes a kept tab). */
+interface CloseTabStep extends StepBase {
+  kind: "close-tab";
+}
+
+interface UserClickStep extends StepBase {
+  kind: "user-click";
+  /** Shown while replay waits, e.g. "Click the email cell". */
+  label?: string;
+  /** Preserved from the original click so convert-back in the editor is lossless. */
+  selector?: string;
+  text?: string;
+}
+
 export type StepAction =
   | NavigateStep
   | ClickStep
@@ -58,7 +74,9 @@ export type StepAction =
   | SubmitStep
   | SleepStep
   | PauseStep
-  | ExtractStep;
+  | ExtractStep
+  | CloseTabStep
+  | UserClickStep;
 
 export interface RecordedEvent {
   action: StepAction;
@@ -71,6 +89,10 @@ export interface RecordedEvent {
 
 /** Active manual recording, if any. */
 export interface RecordingState {
+  /** Tabs closed while recording; becomes a close-tab step if the tab is kept. */
+  closes?: { tabId: number; ts: number }[];
+  /** Tabs opened with an opener while recording; kept-tab spawns are kept too. */
+  spawns?: { openerTabId: number; tabId: number }[];
   startedAt: number;
   startUrl: string;
   tabId: number;
@@ -102,6 +124,8 @@ export interface RunState {
   /** Next step to execute. */
   stepIndex: number;
   tabId: number;
+  /** Live tab ids by ordinal; tabs[0] === tabId. */
+  tabs?: Record<number, number>;
   workflowId: string;
 }
 
@@ -109,7 +133,13 @@ export type StepResult =
   | { ok: true; output?: string }
   | {
       ok: false;
-      reason: "timeout" | "captcha" | "secret" | "pause" | "missing-output";
+      reason:
+        | "timeout"
+        | "captcha"
+        | "secret"
+        | "pause"
+        | "missing-output"
+        | "user-click";
       detail?: string;
     };
 

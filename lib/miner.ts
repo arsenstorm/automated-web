@@ -66,6 +66,54 @@ export function stampEvents(
 }
 
 /**
+ * Cut a recording's event stream into tab-stamped workflow actions. Keeps
+ * only "interaction tabs" — tabs with at least one non-navigate event, plus
+ * the recording tab, plus tabs spawned from a kept tab (a link opened in a
+ * new tab is a step even if the user never interacts there) — so unrelated
+ * background tabs that merely loaded a page never leak into the workflow.
+ * Ordinal 0 is the recording tab; other tabs are numbered in
+ * first-event order.
+ */
+export function assignTabOrdinals(
+  events: RecordedEvent[],
+  recordingTabId: number,
+  spawns: { openerTabId: number; tabId: number }[] = []
+): { actions: StepAction[]; tabIds: number[] } {
+  const sorted = [...events].sort((a, b) => a.ts - b.ts);
+  const interactive = new Set([recordingTabId]);
+  for (const event of sorted) {
+    if (event.tabId !== undefined && event.action.kind !== "navigate") {
+      interactive.add(event.tabId);
+    }
+  }
+  // Fixpoint so a chain of opened tabs (A opens B opens C) is kept whole.
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const spawn of spawns) {
+      if (interactive.has(spawn.openerTabId) && !interactive.has(spawn.tabId)) {
+        interactive.add(spawn.tabId);
+        grew = true;
+      }
+    }
+  }
+  const kept = sorted.filter(
+    (event) => event.tabId !== undefined && interactive.has(event.tabId)
+  );
+  const tabIds = [recordingTabId];
+  for (const event of kept) {
+    if (event.tabId !== undefined && !tabIds.includes(event.tabId)) {
+      tabIds.push(event.tabId);
+    }
+  }
+  const actions = kept.map((event) => {
+    const ordinal = tabIds.indexOf(event.tabId ?? recordingTabId);
+    return ordinal === 0 ? event.action : { ...event.action, tab: ordinal };
+  });
+  return { actions, tabIds };
+}
+
+/**
  * Split events into per-origin sessions. A session ends on an origin change,
  * a >60s idle gap, or a navigation back to the pathname the session started
  * on (the user restarting the same flow back-to-back).
@@ -152,6 +200,49 @@ const sequencesOf = (session: RecordedEvent[]): RecordedEvent[][] => {
 };
 
 /**
+ * Insert a navigate for any extra tab whose first action isn't one (a
+ * pre-existing tab the user switched into mid-session), so replay can
+ * materialize the tab. Origin fallback only — the pure miner has no live
+ * tabs to ask; the manual-recording path (ensureTabEntryNavigates) prefers
+ * the tab's live URL.
+ */
+const withEntryNavigates = (
+  actions: StepAction[],
+  tabIds: number[],
+  events: RecordedEvent[]
+): StepAction[] => {
+  const result = [...actions];
+  for (let ordinal = 1; ordinal < tabIds.length; ordinal += 1) {
+    const firstIndex = result.findIndex(
+      (action) => (action.tab ?? 0) === ordinal
+    );
+    if (firstIndex < 0 || result[firstIndex]?.kind === "navigate") {
+      continue;
+    }
+    const url = events.find((event) => event.tabId === tabIds[ordinal])?.origin;
+    if (url) {
+      result.splice(firstIndex, 0, { kind: "navigate", tab: ordinal, url });
+    }
+  }
+  return result;
+};
+
+/**
+ * A mined sequence's workflow steps: tab-ordinal-stamped so multi-tab
+ * sessions replay in their own tabs (ordinal 0 is the session's first tab),
+ * with stray navigates from non-interactive tabs dropped. Falls back to raw
+ * actions for legacy events without tab ids.
+ */
+const minedSteps = (sequence: RecordedEvent[]): StepAction[] => {
+  const firstTab = sequence[0]?.tabId;
+  if (firstTab === undefined) {
+    return sequence.map((event) => event.action);
+  }
+  const { actions, tabIds } = assignTabOrdinals(sequence, firstTab);
+  return withEntryNavigates(actions, tabIds, sequence);
+};
+
+/**
  * Fold closed sessions into the pattern table. ponytail: exact fingerprint
  * match; add fuzzy (LCS) matching only if real sites reorder steps enough
  * to matter.
@@ -174,7 +265,7 @@ export function mine(
       lastSuggestedAt: previous?.lastSuggestedAt,
       origin: sequence[0]?.origin ?? "",
       // Freshest steps win so replay uses the newest input values.
-      steps: sequence.map((event) => event.action),
+      steps: minedSteps(sequence),
     };
   }
   return next;
@@ -186,10 +277,14 @@ export function mine(
  * by a submit when building workflow steps.
  */
 export function toWorkflowSteps(steps: StepAction[]): StepAction[] {
-  return steps.filter(
-    (step, index) =>
-      !(step.kind === "click" && steps[index + 1]?.kind === "submit")
-  );
+  return steps.filter((step, index) => {
+    const next = steps[index + 1];
+    return !(
+      step.kind === "click" &&
+      next?.kind === "submit" &&
+      (step.tab ?? 0) === (next.tab ?? 0)
+    );
+  });
 }
 
 /**

@@ -86,6 +86,12 @@ export function describeStep(step: StepAction): string {
       return `Wait ${step.ms / MS_PER_SECOND}s`;
     case "pause":
       return "Pause for me";
+    case "user-click":
+      return step.label
+        ? `Wait for my click — ${step.label}`
+        : "Wait for my click";
+    case "close-tab":
+      return "Close the tab";
     default:
       return `Extract text from ${step.selector}`;
   }

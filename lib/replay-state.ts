@@ -93,6 +93,39 @@ export const samePathname = (a: string | undefined, b: string): boolean => {
   }
 };
 
+/**
+ * Best existing tab for a URL: exact sameUrl match first (pendingUrl covers
+ * just-spawned tabs still loading), else first same-origin tab. Never picks a
+ * tab already owned by the run.
+ */
+export function pickTabForUrl(
+  candidates: { id?: number; url?: string; pendingUrl?: string }[],
+  url: string,
+  excludeIds: number[]
+): { id: number; exact: boolean } | null {
+  const excluded = new Set(excludeIds);
+  const eligible = candidates.filter(
+    (tab) => tab.id !== undefined && !excluded.has(tab.id)
+  );
+  // A just-spawned tab reports url "" with the target in pendingUrl.
+  const urlOf = (tab: { url?: string; pendingUrl?: string }) =>
+    tab.url ? tab.url : tab.pendingUrl;
+  const exact = eligible.find((tab) => sameUrl(urlOf(tab), url));
+  if (exact?.id !== undefined) {
+    return { exact: true, id: exact.id };
+  }
+  if (!URL.canParse(url)) {
+    return null;
+  }
+  const { origin } = new URL(url);
+  const originOf = (candidate: string | undefined): string | null =>
+    candidate && URL.canParse(candidate) ? new URL(candidate).origin : null;
+  const sameOrigin = eligible.find((tab) => originOf(urlOf(tab)) === origin);
+  return sameOrigin?.id === undefined
+    ? null
+    : { exact: false, id: sameOrigin.id };
+}
+
 /** Did this recorded user action perform the given workflow step? */
 const matchesStep = (step: StepAction, action: StepAction): boolean => {
   if (step.kind === "navigate" && action.kind === "navigate") {
@@ -116,12 +149,12 @@ const matchesStep = (step: StepAction, action: StepAction): boolean => {
  * performed by hand while the run was paused (e.g. typed the password and hit
  * submit instead of pressing play). Greedy in-order match of upcoming steps
  * against the user's recorded actions; stops at the first step with no
- * matching action or that a user can't perform (sleep/pause/extract).
+ * matching action or that a user can't perform (sleep/pause/extract/user-click).
  */
 export function healedStepIndex(
   startIndex: number,
   steps: StepAction[],
-  actions: StepAction[]
+  actions: { action: StepAction; tab: number }[]
 ): number {
   let stepIndex = startIndex;
   let cursor = 0;
@@ -131,12 +164,16 @@ export function healedStepIndex(
       !step ||
       step.kind === "sleep" ||
       step.kind === "pause" ||
-      step.kind === "extract"
+      step.kind === "extract" ||
+      step.kind === "user-click"
     ) {
       break;
     }
     const found = actions.findIndex(
-      (action, i) => i >= cursor && matchesStep(step, action)
+      (entry, i) =>
+        i >= cursor &&
+        entry.tab === (step.tab ?? 0) &&
+        matchesStep(step, entry.action)
     );
     if (found < 0) {
       break;
@@ -153,6 +190,11 @@ export function healedStepIndex(
  */
 export function isPauseBlock(run: RunState): boolean {
   return run.pausedReason?.startsWith("pause") ?? false;
+}
+
+/** True when a paused run is waiting for the user's click (user-click step). */
+export function isUserClickBlock(run: RunState): boolean {
+  return run.pausedReason?.startsWith("user-click") ?? false;
 }
 
 const CAPTCHA_IFRAME = /recaptcha|hcaptcha|turnstile/i;

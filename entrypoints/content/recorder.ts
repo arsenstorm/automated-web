@@ -31,7 +31,7 @@ const recordingSuppressed = () => Date.now() < suppressUntil;
  * events from inside shadow roots; composedPath()[0] is the inner element.
  * Both fall back gracefully for synthetic events without composedPath.
  */
-const eventTarget = (event: Event): EventTarget | null => {
+export const eventTarget = (event: Event): EventTarget | null => {
   const first = event.composedPath?.()[0];
   return first instanceof Element ? first : event.target;
 };
@@ -76,6 +76,15 @@ export const onClick = (event: MouseEvent) => {
       .find((node) => node instanceof Element && node.matches(ACTIONABLE)) ??
     target.closest(ACTIONABLE);
   if (!(actionable instanceof Element)) {
+    return;
+  }
+  // Cmd/ctrl/shift+click on a link opens a new tab/window; skip the click —
+  // the new tab's own navigate event carries the intent, and a replayed
+  // plain click would navigate this tab away instead of spawning one.
+  if (
+    (event.metaKey || event.ctrlKey || event.shiftKey) &&
+    actionable.matches("a[href]")
+  ) {
     return;
   }
   const { selector, text } = describeElement(actionable);

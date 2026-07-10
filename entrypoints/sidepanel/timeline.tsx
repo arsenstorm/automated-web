@@ -70,6 +70,11 @@ const ADDABLE: {
     label: "Extract text",
     make: (id) => ({ id, kind: "extract", selector: "" }),
   },
+  {
+    icon: X,
+    label: "Close a tab",
+    make: (id) => ({ id, kind: "close-tab" }),
+  },
 ];
 
 type Addable = (typeof ADDABLE)[number];
@@ -110,6 +115,7 @@ function DraftStepRow({
   draftLength,
   earlierOutputs,
   expanded,
+  maxTab,
   onUpdate,
   onMove,
   onRemove,
@@ -120,6 +126,7 @@ function DraftStepRow({
   draftLength: number;
   earlierOutputs: OutputOption[];
   expanded: boolean;
+  maxTab: number;
   onUpdate: (index: number, step: StepAction) => void;
   onMove: (index: number, delta: -1 | 1) => void;
   onRemove: (index: number) => void;
@@ -142,6 +149,7 @@ function DraftStepRow({
     <StepRow
       earlierOutputs={earlierOutputs}
       expanded={expanded}
+      maxTab={maxTab}
       moveDownDisabled={index >= draftLength - 1}
       moveUpDisabled={index <= 1}
       onChange={handleChange}
@@ -175,12 +183,13 @@ export function TimelineView({
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
   const validationError = dirty ? validateSteps(draft) : null;
   const [first, ...rest] = draft;
+  const maxTab = Math.max(0, ...draft.map((step) => step.tab ?? 0));
 
   const outputsBefore = (index: number): OutputOption[] =>
     draft
       .slice(0, index)
       .flatMap((step) =>
-        step.kind === "extract" && step.id
+        (step.kind === "extract" || step.kind === "user-click") && step.id
           ? [{ id: step.id, label: describeStep(step) }]
           : []
       );
@@ -225,7 +234,13 @@ export function TimelineView({
 
   const add = useCallback(
     (make: (id: string) => StepAction) => {
-      const step = make(nextStepId(draft));
+      // Inherit the last step's tab so an appended step doesn't silently
+      // target tab 0 in a cross-tab workflow.
+      const tab = draft.at(-1)?.tab;
+      const step = {
+        ...make(nextStepId(draft)),
+        ...(tab === undefined ? {} : { tab }),
+      };
       setDraft([...draft, step]);
       setExpandedId(step.id ?? null);
     },
@@ -331,6 +346,7 @@ export function TimelineView({
                 expanded={expandedId === step.id}
                 index={index}
                 key={step.id ?? index}
+                maxTab={maxTab}
                 onMove={move}
                 onRemove={remove}
                 onToggle={toggle}

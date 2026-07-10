@@ -88,4 +88,11 @@ describe("describeStep", () => {
       "Extract text from .price"
     );
   });
+
+  it("labels user-click with and without a label", () => {
+    expect(describeStep({ kind: "user-click", label: "the email cell" })).toBe(
+      "Wait for my click — the email cell"
+    );
+    expect(describeStep({ kind: "user-click" })).toBe("Wait for my click");
+  });
 });

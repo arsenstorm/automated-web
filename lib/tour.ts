@@ -57,7 +57,8 @@ export const DEMOS: TourDemo[] = [
 /** True when any recorded step targeted one of the demo's elements. */
 export const matchesDemo = (steps: StepAction[], ids: string[]): boolean =>
   steps.some(
-    (step) => "selector" in step && ids.some((id) => step.selector.includes(id))
+    (step) =>
+      "selector" in step && ids.some((id) => step.selector?.includes(id))
   );
 
 /** Record finished: if it captured the current demo, move to the replay phase. */

@@ -28,12 +28,14 @@ import type { StepAction } from "../../lib/types";
 
 const KIND_LABELS: Record<StepAction["kind"], string> = {
   click: "click",
+  "close-tab": "close tab",
   extract: "extract",
   input: "type",
   navigate: "open",
   pause: "pause",
   sleep: "wait",
   submit: "submit",
+  "user-click": "your click",
 };
 
 const MS_PER_SECOND = 1000;
@@ -209,6 +211,18 @@ function ClickFields({
     (text: string) => onChange({ ...step, text: text || undefined }),
     [step, onChange]
   );
+  // Spread preserves id/frameUrl/tab/selector/text so converting back is
+  // lossless. The label slots into "Click … to continue" on the page, so the
+  // recorded button text is seeded in quotes.
+  const convertToUserClick = useCallback(
+    () =>
+      onChange({
+        ...step,
+        kind: "user-click",
+        label: step.text ? `“${step.text}”` : undefined,
+      }),
+    [step, onChange]
+  );
   return (
     <>
       <Field
@@ -223,6 +237,70 @@ function ClickFields({
         placeholder="Buy now"
         value={step.text ?? ""}
       />
+      <button
+        className={cn(GHOST_TEXT_BUTTON, "self-start px-1 py-1 text-xs")}
+        onClick={convertToUserClick}
+        type="button"
+      >
+        Wait for my click instead
+      </button>
+      <p className="text-muted-foreground text-xs">
+        Replay will pause here and let you pick the element by clicking it.
+      </p>
+    </>
+  );
+}
+
+function UserClickFields({
+  step,
+  onChange,
+}: {
+  step: StepOf<"user-click">;
+  onChange: (step: StepAction) => void;
+}) {
+  const { selector } = step;
+  const setLabel = useCallback(
+    (label: string) => onChange({ ...step, label: label || undefined }),
+    [step, onChange]
+  );
+  const convertToClick = useCallback(() => {
+    if (!selector) {
+      return;
+    }
+    // Built explicitly: a spread would smuggle `label` into a ClickStep.
+    onChange({
+      frameUrl: step.frameUrl,
+      id: step.id,
+      kind: "click",
+      selector,
+      tab: step.tab,
+      text: step.text,
+    });
+  }, [step, selector, onChange]);
+  return (
+    <>
+      <Field
+        label="Shown on the page as “Click … to continue”"
+        onChange={setLabel}
+        placeholder="the email cell"
+        value={step.label ?? ""}
+      />
+      {step.id ? (
+        <p className="text-muted-foreground text-xs">
+          The clicked element's text is available as{" "}
+          <code className="rounded bg-secondary px-1">{`{{${step.id}}}`}</code>{" "}
+          in a later step's value or URL.
+        </p>
+      ) : null}
+      {selector ? (
+        <button
+          className={cn(GHOST_TEXT_BUTTON, "self-start px-1 py-1 text-xs")}
+          onClick={convertToClick}
+          type="button"
+        >
+          Use recorded click again
+        </button>
+      ) : null}
     </>
   );
 }
@@ -396,8 +474,16 @@ function StepFields({
           Replay stops here until you press Resume.
         </p>
       );
+    case "close-tab":
+      return (
+        <p className="text-muted-foreground text-sm">
+          Replay closes this step's tab here.
+        </p>
+      );
     case "extract":
       return <ExtractFields onChange={onChange} step={step} />;
+    case "user-click":
+      return <UserClickFields onChange={onChange} step={step} />;
     default:
       return null;
   }
@@ -408,6 +494,7 @@ export function StepRow({
   pinned = false,
   expanded,
   earlierOutputs,
+  maxTab = 0,
   moveUpDisabled = true,
   moveDownDisabled = true,
   onToggle,
@@ -420,6 +507,8 @@ export function StepRow({
   pinned?: boolean;
   expanded: boolean;
   earlierOutputs: OutputOption[];
+  /** Highest tab ordinal used in the draft (0 for single-tab workflows). */
+  maxTab?: number;
   moveUpDisabled?: boolean;
   moveDownDisabled?: boolean;
   onToggle: () => void;
@@ -435,6 +524,14 @@ export function StepRow({
   );
   const moveUp = useCallback(() => onMove?.(-1), [onMove]);
   const moveDown = useCallback(() => onMove?.(1), [onMove]);
+  const setTab = useCallback(
+    (event: ChangeEvent<HTMLSelectElement>) => {
+      const next = Number(event.target.value);
+      // Ordinal 0 is stored as undefined everywhere (recorder, `?? 0` reads).
+      onChange({ ...step, tab: next === 0 ? undefined : next });
+    },
+    [step, onChange]
+  );
 
   const body = (
     <>
@@ -461,6 +558,9 @@ export function StepRow({
           type="button"
         >
           <Badge tone="neutral">{KIND_LABELS[step.kind]}</Badge>
+          {(step.tab ?? 0) > 0 ? (
+            <Badge tone="neutral">{`Tab ${(step.tab ?? 0) + 1}`}</Badge>
+          ) : null}
           <span className="min-w-0 flex-1 truncate text-sm">
             {describeStep(step)}
           </span>
@@ -475,6 +575,27 @@ export function StepRow({
       </div>
       <Expand show={expanded}>
         <div className="flex flex-col gap-2 px-1 pb-3">
+          {/* Step 0 is the start tab by definition; no re-assign there. */}
+          {!pinned && (
+            <label className="flex flex-col gap-1">
+              <span className="text-muted-foreground text-xs">Tab</span>
+              <select
+                className={cn(INPUT, "py-1")}
+                onChange={setTab}
+                value={step.tab ?? 0}
+              >
+                {Array.from({ length: maxTab + 2 }, (_, i) => i).map(
+                  (ordinal) => (
+                    <option key={ordinal} value={ordinal}>
+                      {ordinal > maxTab
+                        ? `New tab (Tab ${ordinal + 1})`
+                        : `Tab ${ordinal + 1}`}
+                    </option>
+                  )
+                )}
+              </select>
+            </label>
+          )}
           <StepFields
             earlierOutputs={earlierOutputs}
             onChange={onChange}

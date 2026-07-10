@@ -61,11 +61,14 @@ const applyStep = (el: Element, step: StepAction) => {
 };
 
 export const executeStep = async (step: StepAction): Promise<StepResult> => {
-  // navigate/sleep/pause are handled by the background and never sent here.
+  // navigate/sleep/pause/close-tab/user-click are handled by the background
+  // and never sent here.
   if (
     step.kind === "navigate" ||
     step.kind === "sleep" ||
-    step.kind === "pause"
+    step.kind === "pause" ||
+    step.kind === "close-tab" ||
+    step.kind === "user-click"
   ) {
     return { ok: true };
   }

@@ -12,6 +12,7 @@ import {
 } from "./recorder";
 import { showToast } from "./toast";
 import { mountTour } from "./tour";
+import { armUserClick, disarmUserClick, onUserClick } from "./user-click";
 
 const FLUSH_INTERVAL_MS = 5000;
 
@@ -51,6 +52,7 @@ export default defineContentScript({
       window.addEventListener("popstate", recordNavigate);
     }
 
+    document.addEventListener("click", onUserClick, true);
     document.addEventListener("click", onClick, true);
     document.addEventListener("change", onChange, true);
     document.addEventListener("submit", onSubmit, true);
@@ -68,6 +70,10 @@ export default defineContentScript({
     }
     onMessage("executeStep", ({ data }) => executeStep(data.step));
     onMessage("flushNow", () => flush());
+    onMessage("armUserClick", ({ data }) =>
+      armUserClick(data.label, data.workflowName)
+    );
+    onMessage("disarmUserClick", () => disarmUserClick());
   },
   // Chrome rejects a content script declaring both matchAboutBlank and
   // matchOriginAsFallback, and matchOriginAsFallback covers about:blank plus

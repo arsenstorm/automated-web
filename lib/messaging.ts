@@ -16,9 +16,13 @@ export type VaultStatus = "open" | "locked" | "no-password";
  * `sendMessage("name", data)` / `onMessage("name", handler)`.
  */
 export interface ProtocolMap {
+  /** Arm every frame in a tab to capture the user's next click (user-click step). */
+  armUserClick: (data: { label?: string; workflowName: string }) => void;
   cancelRecording: () => void;
   cancelRun: () => void;
   deleteWorkflow: (id: string) => void;
+  /** Clear an armed user-click capture (run resumed, skipped, or cancelled). */
+  disarmUserClick: () => void;
   dismissSuggestion: (data: { fingerprint: string; never: boolean }) => void;
   executeStep: (data: { step: StepAction }) => StepResult;
   /** Ship buffered events immediately (used when a manual recording stops). */
@@ -50,6 +54,8 @@ export interface ProtocolMap {
   unlockVault: (password: string) => boolean;
   /** Replace a workflow's steps (timeline editor). Throws when invalid. */
   updateWorkflowSteps: (data: { id: string; steps: StepAction[] }) => void;
+  /** The armed click happened; output is the clicked element's text/value. */
+  userClickDone: (data: { output: string }) => void;
   vaultStatus: () => VaultStatus;
 }
 

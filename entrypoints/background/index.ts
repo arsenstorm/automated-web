@@ -1,15 +1,19 @@
 import { fireAndForget, onMessage } from "@/lib/messaging";
 import { stampEvents } from "@/lib/miner";
+import { isUserClickBlock } from "@/lib/replay-state";
 import { getStored, setStored } from "@/lib/storage";
 import { EVENT_BUFFER_CAP } from "@/lib/types";
 import { validateSteps } from "@/lib/workflow";
 import { dismissSuggestion, runMiner, saveSuggestion } from "./mining";
-import { startRecording, stopRecording } from "./recording";
+import { startRecording, stopRecording, watchRecordingTabs } from "./recording";
 import {
+  completeUserClick,
   continueRun,
+  disarmUserClickRun,
   maybeAutoResume,
   pauseInterruptedRun,
   startRun,
+  watchSpawnedTabs,
 } from "./replay";
 import {
   getSecure,
@@ -60,6 +64,9 @@ export default defineBackground(() => {
   });
 
   fireAndForget(pauseInterruptedRun());
+  // MV3 listeners must register synchronously at SW startup.
+  watchSpawnedTabs();
+  watchRecordingTabs();
 
   onMessage("ping", () => {
     // Liveness check.
@@ -144,7 +151,16 @@ export default defineBackground(() => {
   onMessage("resumeRun", () => {
     fireAndForget(continueRun({ skip: false }));
   });
-  onMessage("cancelRun", () => setStored("run", null));
+  onMessage("userClickDone", ({ data, sender }) =>
+    completeUserClick(data.output, sender.tab?.id)
+  );
+  onMessage("cancelRun", async () => {
+    const run = await getStored("run");
+    if (run && isUserClickBlock(run)) {
+      await disarmUserClickRun(run);
+    }
+    await setStored("run", null);
+  });
   onMessage("getRunState", () => getStored("run"));
   onMessage("vaultStatus", () => vaultStatus());
   onMessage("unlockVault", ({ data }) => unlockVault(data));

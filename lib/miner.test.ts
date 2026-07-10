@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  assignTabOrdinals,
   fingerprintSession,
   mine,
   pendingSuggestions,
@@ -90,6 +91,159 @@ describe("stampEvents", () => {
   });
 });
 
+describe("assignTabOrdinals", () => {
+  const RECORDING_TAB = 1;
+
+  it("assigns ordinal 0 to the recording tab with no tab field stamped", () => {
+    const events: RecordedEvent[] = [
+      {
+        action: { kind: "navigate", url: `${ORIGIN}/a` },
+        origin: ORIGIN,
+        tabId: RECORDING_TAB,
+        ts: 0,
+      },
+      {
+        action: { kind: "click", selector: "#go" },
+        origin: ORIGIN,
+        tabId: RECORDING_TAB,
+        ts: 1000,
+      },
+    ];
+    const { actions, tabIds } = assignTabOrdinals(events, RECORDING_TAB);
+    expect(tabIds).toEqual([RECORDING_TAB]);
+    expect(actions.every((action) => action.tab === undefined)).toBe(true);
+  });
+
+  it("stamps a second tab's actions with tab: 1 in ts order", () => {
+    const events: RecordedEvent[] = [
+      {
+        action: { kind: "navigate", url: `${ORIGIN}/a` },
+        origin: ORIGIN,
+        tabId: RECORDING_TAB,
+        ts: 0,
+      },
+      {
+        action: { kind: "navigate", url: `${ORIGIN}/b` },
+        origin: ORIGIN,
+        tabId: 2,
+        ts: 500,
+      },
+      {
+        action: { kind: "click", selector: "#other-tab" },
+        origin: ORIGIN,
+        tabId: 2,
+        ts: 1000,
+      },
+      {
+        action: { kind: "click", selector: "#go" },
+        origin: ORIGIN,
+        tabId: RECORDING_TAB,
+        ts: 1500,
+      },
+    ];
+    const { actions, tabIds } = assignTabOrdinals(events, RECORDING_TAB);
+    expect(tabIds).toEqual([RECORDING_TAB, 2]);
+    const otherTabActions = actions.filter(
+      (action) => "selector" in action && action.selector === "#other-tab"
+    );
+    expect(otherTabActions[0]?.tab).toBe(1);
+  });
+
+  it("keeps a navigate-only tab spawned from a kept tab", () => {
+    const events: RecordedEvent[] = [
+      {
+        action: { kind: "click", selector: "#open-doc" },
+        origin: ORIGIN,
+        tabId: RECORDING_TAB,
+        ts: 0,
+      },
+      {
+        action: { kind: "navigate", url: `${ORIGIN}/doc` },
+        origin: ORIGIN,
+        tabId: 2,
+        ts: 500,
+      },
+    ];
+    const { actions, tabIds } = assignTabOrdinals(events, RECORDING_TAB, [
+      { openerTabId: RECORDING_TAB, tabId: 2 },
+    ]);
+    expect(tabIds).toEqual([RECORDING_TAB, 2]);
+    expect(actions[1]).toMatchObject({ kind: "navigate", tab: 1 });
+  });
+
+  it("keeps a chain of spawned tabs regardless of spawn-edge order", () => {
+    const events: RecordedEvent[] = [
+      {
+        action: { kind: "navigate", url: `${ORIGIN}/b` },
+        origin: ORIGIN,
+        tabId: 2,
+        ts: 0,
+      },
+      {
+        action: { kind: "navigate", url: `${ORIGIN}/c` },
+        origin: ORIGIN,
+        tabId: 3,
+        ts: 500,
+      },
+    ];
+    // Edge order reversed on purpose: the fixpoint must still close the chain.
+    const { tabIds } = assignTabOrdinals(events, RECORDING_TAB, [
+      { openerTabId: 2, tabId: 3 },
+      { openerTabId: RECORDING_TAB, tabId: 2 },
+    ]);
+    expect(tabIds).toEqual([RECORDING_TAB, 2, 3]);
+  });
+
+  it("drops a navigate-only tab spawned from an unrelated tab", () => {
+    const events: RecordedEvent[] = [
+      {
+        action: { kind: "navigate", url: `${ORIGIN}/b` },
+        origin: ORIGIN,
+        tabId: 2,
+        ts: 0,
+      },
+    ];
+    const { tabIds } = assignTabOrdinals(events, RECORDING_TAB, [
+      { openerTabId: 99, tabId: 2 },
+    ]);
+    expect(tabIds).toEqual([RECORDING_TAB]);
+  });
+
+  it("drops a tab that only ever navigated", () => {
+    const events: RecordedEvent[] = [
+      {
+        action: { kind: "navigate", url: `${ORIGIN}/a` },
+        origin: ORIGIN,
+        tabId: RECORDING_TAB,
+        ts: 0,
+      },
+      {
+        action: { kind: "navigate", url: `${ORIGIN}/b` },
+        origin: ORIGIN,
+        tabId: 2,
+        ts: 500,
+      },
+    ];
+    const { actions, tabIds } = assignTabOrdinals(events, RECORDING_TAB);
+    expect(tabIds).toEqual([RECORDING_TAB]);
+    expect(actions).toHaveLength(1);
+  });
+
+  it("drops events with an undefined tabId", () => {
+    const events: RecordedEvent[] = [
+      {
+        action: { kind: "navigate", url: `${ORIGIN}/a` },
+        origin: ORIGIN,
+        tabId: RECORDING_TAB,
+        ts: 0,
+      },
+      { action: { kind: "click", selector: "#go" }, origin: ORIGIN, ts: 1000 },
+    ];
+    const { actions } = assignTabOrdinals(events, RECORDING_TAB);
+    expect(actions).toHaveLength(1);
+  });
+});
+
 describe("sessionize", () => {
   it("splits on time gaps and origin changes, keeps the open tail", () => {
     const events = [
@@ -153,6 +307,87 @@ describe("mine", () => {
       (step) => step.kind === "input" && step.sensitive
     );
     expect(inputStep?.kind === "input" && inputStep.value).toBe("ref-new");
+  });
+
+  it("stamps tab ordinals on a multi-tab session's steps", () => {
+    const events: RecordedEvent[] = [
+      {
+        action: { kind: "navigate", url: `${ORIGIN}/list` },
+        origin: ORIGIN,
+        tabId: 1,
+        ts: 0,
+      },
+      {
+        action: { kind: "click", selector: "#open-item" },
+        origin: ORIGIN,
+        tabId: 1,
+        ts: 1000,
+      },
+      {
+        action: { kind: "navigate", url: `${ORIGIN}/item` },
+        origin: ORIGIN,
+        tabId: 2,
+        ts: 2000,
+      },
+      {
+        action: { kind: "click", selector: "#copy" },
+        origin: ORIGIN,
+        tabId: 2,
+        ts: 3000,
+      },
+    ];
+    const [pattern] = Object.values(mine([events], {}));
+    expect(pattern?.steps.map((step) => step.tab ?? 0)).toEqual([0, 0, 1, 1]);
+  });
+
+  it("inserts an entry navigate for a tab that starts mid-flow", () => {
+    const events: RecordedEvent[] = [
+      {
+        action: { kind: "navigate", url: `${ORIGIN}/list` },
+        origin: ORIGIN,
+        tabId: 1,
+        ts: 0,
+      },
+      {
+        action: { kind: "click", selector: "#open-item" },
+        origin: ORIGIN,
+        tabId: 1,
+        ts: 1000,
+      },
+      {
+        action: { kind: "click", selector: "#pre-existing" },
+        origin: ORIGIN,
+        tabId: 2,
+        ts: 2000,
+      },
+    ];
+    const [pattern] = Object.values(mine([events], {}));
+    expect(pattern?.steps[2]).toMatchObject({
+      kind: "navigate",
+      tab: 1,
+      url: ORIGIN,
+    });
+    expect(pattern?.steps[3]).toMatchObject({ kind: "click", tab: 1 });
+  });
+
+  it("drops a non-interactive tab's stray navigate from mined steps", () => {
+    // Sorted: sequencesOf cuts the submit prefix in array order, and the
+    // stray navigate must land inside it.
+    const events: RecordedEvent[] = [
+      ...loginSession(0).map((event) => ({ ...event, tabId: 1 })),
+      {
+        action: { kind: "navigate", url: `${ORIGIN}/background-load` },
+        origin: ORIGIN,
+        tabId: 2,
+        ts: 500,
+      } as RecordedEvent,
+    ].sort((a, b) => a.ts - b.ts);
+    const [pattern] = Object.values(mine([events], {}));
+    expect(
+      pattern?.steps.some(
+        (step) => step.kind === "navigate" && step.url.includes("background")
+      )
+    ).toBe(false);
   });
 
   it("preserves the suggestion cooldown across mining runs", () => {
@@ -225,6 +460,22 @@ describe("toWorkflowSteps", () => {
       { kind: "click", selector: "#item" },
     ];
     expect(toWorkflowSteps(steps)).toEqual(steps);
+  });
+
+  it("does not dedupe a click and submit on different tabs", () => {
+    const steps: StepAction[] = [
+      { kind: "click", selector: "#login-button", tab: 0 },
+      { kind: "submit", selector: "#login-form", tab: 1 },
+    ];
+    expect(toWorkflowSteps(steps)).toEqual(steps);
+  });
+
+  it("still dedupes a click and submit on the same explicit tab", () => {
+    const steps: StepAction[] = [
+      { kind: "click", selector: "#login-button", tab: 1 },
+      { kind: "submit", selector: "#login-form", tab: 1 },
+    ];
+    expect(toWorkflowSteps(steps).map((step) => step.kind)).toEqual(["submit"]);
   });
 });
 

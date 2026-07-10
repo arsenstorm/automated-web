@@ -3,7 +3,7 @@
 import { cn } from "cnfast";
 import { motion } from "motion/react";
 import { Badge, type BadgeTone } from "@/components/badge";
-import { isPauseBlock } from "@/lib/replay-state";
+import { isPauseBlock, isUserClickBlock } from "@/lib/replay-state";
 import type { RunState, RunStatus } from "@/lib/types";
 import { useReducedMotion } from "./motion";
 
@@ -16,6 +16,23 @@ const RUN_TONES: Record<RunStatus, BadgeTone> = {
 
 const FULL_WIDTH = 100;
 const MS_PER_SECOND = 1000;
+const USER_CLICK_PREFIX = "user-click: ";
+
+/** The trailing " — reason" appended to the step line, "" when none shown. */
+function reasonSuffix(run: RunState): string {
+  if (run.pausedReason === undefined || isPauseBlock(run)) {
+    return "";
+  }
+  if (isUserClickBlock(run)) {
+    const detail = run.pausedReason.startsWith(USER_CLICK_PREFIX)
+      ? run.pausedReason.slice(USER_CLICK_PREFIX.length)
+      : "";
+    return detail
+      ? ` — waiting for your click — ${detail}`
+      : " — waiting for your click";
+  }
+  return ` — ${run.pausedReason}`;
+}
 
 export function InlinePlayer({
   run,
@@ -28,7 +45,6 @@ export function InlinePlayer({
   sleepMs?: number;
 }) {
   const reducedMotion = useReducedMotion();
-  const showReason = run.pausedReason !== undefined && !isPauseBlock(run);
   const steps = Math.max(total - 1, 1);
   const completed =
     run.status === "done" ? steps : Math.max(run.stepIndex - 1, 0);
@@ -67,7 +83,7 @@ export function InlinePlayer({
       >
         <p className="min-w-0 truncate text-muted-foreground text-sm tabular-nums">
           Step {Math.min(Math.max(run.stepIndex, 1), steps)} of {steps}
-          {showReason ? ` — ${run.pausedReason}` : ""}
+          {reasonSuffix(run)}
         </p>
         <Badge tone={RUN_TONES[run.status]}>{run.status}</Badge>
       </div>

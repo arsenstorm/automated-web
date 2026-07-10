@@ -23,6 +23,23 @@ describe("buildWorkflow", () => {
     });
   });
 
+  it("prepends a navigate to the start URL when the first action is for another tab", () => {
+    const workflow = buildWorkflow({
+      actions: [{ kind: "navigate", tab: 1, url: "https://example.com/other" }],
+      fingerprint: "abc",
+      startUrl: "https://example.com/app",
+    });
+    expect(workflow.steps[0]).toEqual({
+      kind: "navigate",
+      url: "https://example.com/app",
+    });
+    expect(workflow.steps[1]).toEqual({
+      kind: "navigate",
+      tab: 1,
+      url: "https://example.com/other",
+    });
+  });
+
   it("keeps an existing leading navigate and drops click-before-submit", () => {
     const workflow = buildWorkflow({
       actions: [
@@ -139,6 +156,38 @@ describe("validateSteps", () => {
         NAV,
         { id: "s2", kind: "extract", selector: ".link" },
         { id: "s3", kind: "navigate", url: "{{s2}}" },
+      ])
+    ).toBeNull();
+  });
+
+  it("accepts a user-click step with no selector", () => {
+    expect(validateSteps([NAV, { id: "s2", kind: "user-click" }])).toBeNull();
+    expect(
+      validateSteps([NAV, { id: "s2", kind: "user-click", selector: "" }])
+    ).toBeNull();
+  });
+
+  it("requires the first step to open the start tab", () => {
+    expect(
+      validateSteps([{ id: "s1", kind: "navigate", tab: 1, url: NAV.url }])
+    ).toContain("start tab");
+    expect(
+      validateSteps([{ id: "s1", kind: "navigate", tab: 0, url: NAV.url }])
+    ).toBeNull();
+  });
+
+  it("requires a new tab ordinal to start with a navigate", () => {
+    expect(
+      validateSteps([NAV, { id: "s2", kind: "click", selector: "#go", tab: 1 }])
+    ).toContain("must start by opening a page");
+  });
+
+  it("allows a navigate to open a new tab ordinal", () => {
+    expect(
+      validateSteps([
+        NAV,
+        { id: "s2", kind: "navigate", tab: 1, url: "https://example.com/b" },
+        { id: "s3", kind: "click", selector: "#go", tab: 1 },
       ])
     ).toBeNull();
   });

@@ -26,7 +26,7 @@ export function buildWorkflow(options: {
     name: suggestName(actions, new URL(startUrl).host),
     origin: new URL(startUrl).origin,
     steps:
-      steps[0]?.kind === "navigate"
+      steps[0]?.kind === "navigate" && (steps[0].tab ?? 0) === 0
         ? steps
         : [{ kind: "navigate", url: startUrl }, ...steps],
   };
@@ -66,7 +66,15 @@ const stepError = (
   if (index === 0 && step.kind !== "navigate") {
     return "the first step must open a page";
   }
-  if ("selector" in step && !step.selector.trim()) {
+  // startRun drives step 0 in the start tab unconditionally.
+  if (index === 0 && (step.tab ?? 0) !== 0) {
+    return "the first step must open the start tab";
+  }
+  if (
+    step.kind !== "user-click" &&
+    "selector" in step &&
+    !step.selector.trim()
+  ) {
     return `step ${index + 1} needs a selector`;
   }
   if (step.kind === "sleep") {
@@ -105,7 +113,15 @@ export function validateSteps(steps: StepAction[]): string | null {
     return "every step needs a unique id";
   }
   const knownIds = new Set<string>();
+  const seenTabs = new Set<number>([0]);
   for (const [index, step] of steps.entries()) {
+    const tab = step.tab ?? 0;
+    if (!seenTabs.has(tab)) {
+      if (step.kind !== "navigate") {
+        return `step ${index + 1}: a new tab must start by opening a page`;
+      }
+      seenTabs.add(tab);
+    }
     const error = stepError(step, index, knownIds);
     if (error) {
       return error;
