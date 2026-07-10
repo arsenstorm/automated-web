@@ -1,11 +1,8 @@
 /** Manual workflow recording: mark a start point, cut events into a workflow. */
 
 import { sendMessage } from "@/lib/messaging";
-import {
-  assignTabOrdinals,
-  fingerprintSession,
-  toWorkflowSteps,
-} from "@/lib/miner";
+import { fingerprintSession, toWorkflowSteps } from "@/lib/miner";
+import { assignTabOrdinals } from "@/lib/recorded-events";
 import { getStored, setStored } from "@/lib/storage";
 import { advanceTourAfterRecord } from "@/lib/tour";
 import type {

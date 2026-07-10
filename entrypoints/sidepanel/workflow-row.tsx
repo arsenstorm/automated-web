@@ -115,10 +115,7 @@ export function WorkflowRow({
         <Square aria-hidden="true" className="size-4 shrink-0 fill-current" />
       ),
       key: "stop",
-      label:
-        run?.status === "failed"
-          ? `Clear run of ${workflow.name}`
-          : `Stop ${workflow.name}`,
+      label: `Stop ${workflow.name}`,
       onClick: () => {
         fireAndForget(sendMessage("cancelRun"), onChanged);
       },

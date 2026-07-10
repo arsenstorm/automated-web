@@ -1,13 +1,16 @@
 /** In-page spotlight tour over the writeup's demo panels (closed shadow root). */
 
-import { sendMessage } from "@/lib/messaging";
-import { getStored, setStored } from "@/lib/storage";
+import { OVERLAY_CARD_CSS } from "@/lib/overlay-css";
+import { getStored } from "@/lib/storage";
 import { DEMOS, TOUR_URL } from "@/lib/tour";
 import type { TourState } from "@/lib/types";
+import { renderCardContent } from "./tour-card";
+import { cardPosition, spotFrame } from "./tour-layout";
 
 const FIND_PANEL_INTERVAL_MS = 300;
 const FIND_PANEL_MAX_TRIES = 40;
 
+/** Spot highlight plus card sizing/motion, layered over OVERLAY_CARD_CSS. */
 const TOUR_CSS = `
   .spot {
     all: initial;
@@ -21,56 +24,13 @@ const TOUR_CSS = `
     transition: top 0.2s, left 0.2s, width 0.2s, height 0.2s;
   }
   .card {
-    all: initial;
-    position: fixed;
-    z-index: 2147483647;
-    transition: top 0.2s, left 0.2s;
-    display: flex;
-    flex-direction: column;
     gap: 8px;
     width: 380px;
-    max-width: calc(100vw - 32px);
-    padding: 16px;
-    border-radius: 10px;
-    background: oklch(1 0 0);
-    color: oklch(0.141 0.005 285.823);
-    font: 400 14px/1.45 system-ui, sans-serif;
-    box-shadow:
-      0 0 0 1px oklch(0.141 0.005 285.823 / 0.08),
-      0 10px 15px -3px rgb(0 0 0 / 0.1),
-      0 4px 6px -4px rgb(0 0 0 / 0.1);
+    transition: top 0.2s, left 0.2s;
   }
-  p { margin: 0; }
-  .row { display: flex; gap: 8px; }
-  .title { font-weight: 600; }
-  .body { color: oklch(0.552 0.016 285.938); }
   button {
-    all: initial;
-    cursor: pointer;
     align-self: flex-start;
-    padding: 4px 10px;
-    border-radius: 8px;
-    font: 500 13px/1.45 system-ui, sans-serif;
-    color: oklch(0.21 0.006 285.885);
-    background: oklch(0.967 0.001 286.375);
-  }
-  button:hover { background: oklch(0.967 0.001 286.375 / 0.7); }
-  button:focus-visible {
-    outline: 2px solid oklch(0.705 0.015 286.067);
-    outline-offset: 2px;
-  }
-  @media (prefers-color-scheme: dark) {
-    .card {
-      background: oklch(0.21 0.006 285.885);
-      color: oklch(0.985 0 0);
-      box-shadow: 0 0 0 1px oklch(1 0 0 / 0.1);
-    }
-    .body { color: oklch(0.705 0.015 286.067); }
-    button {
-      color: oklch(0.985 0 0);
-      background: oklch(0.274 0.006 286.033);
-    }
-    button:hover { background: oklch(0.274 0.006 286.033 / 0.7); }
+    font-size: 13px;
   }
 `;
 
@@ -101,46 +61,26 @@ const onTourPage = (): boolean => {
   }
 };
 
-const SPOT_PAD = 6;
-const CARD_GAP = 16;
-const VIEWPORT_MARGIN = 16;
-
 const positionSpot = () => {
   if (!(spotEl && panelEl)) {
     return;
   }
   const rect = panelEl.getBoundingClientRect();
-  spotEl.style.top = `${rect.top - SPOT_PAD}px`;
-  spotEl.style.left = `${rect.left - SPOT_PAD}px`;
-  spotEl.style.width = `${rect.width + SPOT_PAD * 2}px`;
-  spotEl.style.height = `${rect.height + SPOT_PAD * 2}px`;
+  const frame = spotFrame(rect);
+  spotEl.style.top = `${frame.top}px`;
+  spotEl.style.left = `${frame.left}px`;
+  spotEl.style.width = `${frame.width}px`;
+  spotEl.style.height = `${frame.height}px`;
   if (!cardEl) {
     return;
   }
-  // Card sits beside the spot, vertically centered on it; if there's no
-  // horizontal room, it drops below the spot instead. Always viewport-clamped.
   const card = cardEl.getBoundingClientRect();
-  const beside = rect.right + SPOT_PAD + CARD_GAP;
-  let left: number;
-  let top: number;
-  if (beside + card.width + VIEWPORT_MARGIN <= window.innerWidth) {
-    left = beside;
-    top = rect.top + rect.height / 2 - card.height / 2;
-  } else if (rect.left - SPOT_PAD - CARD_GAP - card.width >= VIEWPORT_MARGIN) {
-    left = rect.left - SPOT_PAD - CARD_GAP - card.width;
-    top = rect.top + rect.height / 2 - card.height / 2;
-  } else {
-    left = rect.left + rect.width / 2 - card.width / 2;
-    top = rect.bottom + SPOT_PAD + CARD_GAP;
-  }
-  cardEl.style.left = `${Math.min(
-    Math.max(left, VIEWPORT_MARGIN),
-    window.innerWidth - card.width - VIEWPORT_MARGIN
-  )}px`;
-  cardEl.style.top = `${Math.min(
-    Math.max(top, VIEWPORT_MARGIN),
-    window.innerHeight - card.height - VIEWPORT_MARGIN
-  )}px`;
+  const position = cardPosition(rect, card, {
+    height: window.innerHeight,
+    width: window.innerWidth,
+  });
+  cardEl.style.left = `${position.left}px`;
+  cardEl.style.top = `${position.top}px`;
 };
 
 const removeOverlay = () => {
@@ -190,7 +130,7 @@ const ensureOverlay = (): HTMLElement => {
   const host = document.createElement("div");
   const shadow = host.attachShadow({ mode: "closed" });
   const style = document.createElement("style");
-  style.textContent = TOUR_CSS;
+  style.textContent = OVERLAY_CARD_CSS + TOUR_CSS;
   const spot = document.createElement("div");
   spot.className = "spot";
   const card = document.createElement("div");
@@ -218,59 +158,12 @@ const findPanel = (demoIndex: number): Element | null => {
 };
 
 const renderOverlay = (tour: TourState, panel: Element) => {
-  const demo = DEMOS[tour.step];
-  if (!demo) {
+  if (!DEMOS[tour.step]) {
     removeOverlay();
     return;
   }
   const card = ensureOverlay();
-  const title = document.createElement("p");
-  title.className = "title";
-  title.textContent = demo.title;
-  const body = document.createElement("p");
-  body.className = "body";
-  const row = document.createElement("div");
-  row.className = "row";
-  const addButton = (label: string, onClick: () => void) => {
-    const button = document.createElement("button");
-    button.textContent = label;
-    button.addEventListener("click", onClick);
-    row.append(button);
-  };
-  const endTour = () => {
-    setStored("tour", null).catch(() => null);
-  };
-
-  if (tour.phase === "done") {
-    const isLast = tour.step === DEMOS.length - 1;
-    if (isLast) {
-      title.textContent = "You're ready to go";
-      body.textContent =
-        "That's the tour — you can now record and replay workflows on any site. Want to remove the demo workflows the tour created?";
-      addButton("Remove demo workflows", () => {
-        for (const id of tour.workflowIds ?? []) {
-          sendMessage("deleteWorkflow", id).catch(() => null);
-        }
-        endTour();
-      });
-      addButton("Keep them", endTour);
-    } else {
-      body.textContent = demo.doneCopy;
-      addButton("Continue", () => {
-        setStored("tour", {
-          phase: "record",
-          step: tour.step + 1,
-          workflowIds: tour.workflowIds,
-        }).catch(() => null);
-      });
-      addButton("Exit tour", endTour);
-    }
-  } else {
-    body.textContent =
-      tour.phase === "record" ? demo.recordCopy : demo.replayCopy;
-    addButton("Exit tour", endTour);
-  }
-  card.replaceChildren(title, body, row);
+  renderCardContent(card, tour);
 
   // Only re-center when the spotlight moves to a different panel — the same
   // panel re-centering on every phase change reads as the page jumping.

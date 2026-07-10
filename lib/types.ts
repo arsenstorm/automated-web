@@ -78,6 +78,12 @@ export type StepAction =
   | CloseTabStep
   | UserClickStep;
 
+/** The single StepAction variant of a given kind. */
+export type StepOf<Kind extends StepAction["kind"]> = Extract<
+  StepAction,
+  { kind: Kind }
+>;
+
 export interface RecordedEvent {
   action: StepAction;
   /** e.g. https://accounts.example.com */
@@ -107,7 +113,7 @@ export interface Workflow {
   steps: StepAction[];
 }
 
-export type RunStatus = "running" | "paused" | "done" | "failed";
+export type RunStatus = "running" | "paused" | "done";
 
 export interface RunState {
   id: string;

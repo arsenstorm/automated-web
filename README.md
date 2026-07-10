@@ -47,7 +47,7 @@ service-worker restart can never lose track of a run.
 - **Local-only.** No server, no telemetry, no analytics. The Firefox build
   declares [`data_collection_permissions: none`](./wxt.config.ts).
 - **Encrypted at rest.** Recorded events, mined patterns, and saved workflows
-  are AES-GCM-256 encrypted in `storage.local` ([`lib/vault.ts`](./lib/vault.ts)).
+  are AES-GCM-256 encrypted in `storage.local` ([`lib/vault-crypto.ts`](./lib/vault-crypto.ts)).
 - **Locked means dormant.** While the vault is locked nothing records, mines,
   or runs — and a run that reaches an input step mid-lock pauses rather than
   typing into the page.

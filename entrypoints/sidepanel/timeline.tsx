@@ -1,165 +1,20 @@
 /** Timeline editor: view, reorder, and edit a workflow's steps. */
 
-import { cn } from "cnfast";
-import {
-  Globe,
-  type LucideIcon,
-  MousePointerClick,
-  Pause,
-  Plus,
-  ScanText,
-  Send,
-  Timer,
-  Type,
-  X,
-} from "lucide-react";
+import { X } from "lucide-react";
 import { Reorder } from "motion/react";
-import { type RefObject, useCallback, useState } from "react";
-import { IconButton, SmallButton } from "@/components/buttons";
+import { useCallback, useState } from "react";
+import { IconButton } from "@/components/buttons";
 import { ErrorNotice } from "@/components/error-notice";
-import { PopoverMenu } from "@/components/popover-menu";
-import { MENU_ITEM, PRIMARY_BUTTON } from "@/components/styles";
+import { PRIMARY_BUTTON } from "@/components/styles";
 import { ViewTitle } from "@/components/view-title";
 import { sendMessage } from "@/lib/messaging";
 import { describeStep } from "@/lib/naming";
 import type { StepAction, Workflow } from "@/lib/types";
 import { ensureStepIds, nextStepId, validateSteps } from "@/lib/workflow";
-import { type OutputOption, StepRow } from "./step-row";
-
-const DEFAULT_SLEEP_MS = 5000;
-
-const ADDABLE: {
-  label: string;
-  icon: LucideIcon;
-  make: (id: string) => StepAction;
-}[] = [
-  {
-    icon: Globe,
-    label: "Open a page",
-    make: (id) => ({ id, kind: "navigate", url: "" }),
-  },
-  {
-    icon: MousePointerClick,
-    label: "Click an element",
-    make: (id) => ({ id, kind: "click", selector: "" }),
-  },
-  {
-    icon: Type,
-    label: "Type text",
-    make: (id) => ({
-      id,
-      kind: "input",
-      selector: "",
-      sensitive: false,
-      value: "",
-    }),
-  },
-  {
-    icon: Send,
-    label: "Submit a form",
-    make: (id) => ({ id, kind: "submit", selector: "" }),
-  },
-  {
-    icon: Timer,
-    label: "Wait",
-    make: (id) => ({ id, kind: "sleep", ms: DEFAULT_SLEEP_MS }),
-  },
-  { icon: Pause, label: "Pause for me", make: (id) => ({ id, kind: "pause" }) },
-  {
-    icon: ScanText,
-    label: "Extract text",
-    make: (id) => ({ id, kind: "extract", selector: "" }),
-  },
-  {
-    icon: X,
-    label: "Close a tab",
-    make: (id) => ({ id, kind: "close-tab" }),
-  },
-];
-
-type Addable = (typeof ADDABLE)[number];
-
-function AddStepItem({
-  entry,
-  close,
-  onAdd,
-}: {
-  entry: Addable;
-  close: () => void;
-  onAdd: (make: Addable["make"]) => void;
-}) {
-  const { label, icon: Icon, make } = entry;
-  const handleClick = useCallback(() => {
-    close();
-    onAdd(make);
-  }, [close, onAdd, make]);
-  return (
-    <button
-      className={cn(MENU_ITEM, "flex items-center gap-2")}
-      onClick={handleClick}
-      type="button"
-    >
-      <Icon
-        aria-hidden="true"
-        className="size-4 shrink-0 text-muted-foreground"
-      />
-      {label}
-    </button>
-  );
-}
-
-/** Wires one draft step's row to index-based callbacks with stable handlers. */
-function DraftStepRow({
-  index,
-  step,
-  draftLength,
-  earlierOutputs,
-  expanded,
-  maxTab,
-  onUpdate,
-  onMove,
-  onRemove,
-  onToggle,
-}: {
-  index: number;
-  step: StepAction;
-  draftLength: number;
-  earlierOutputs: OutputOption[];
-  expanded: boolean;
-  maxTab: number;
-  onUpdate: (index: number, step: StepAction) => void;
-  onMove: (index: number, delta: -1 | 1) => void;
-  onRemove: (index: number) => void;
-  onToggle: (id: string | undefined) => void;
-}) {
-  const handleChange = useCallback(
-    (next: StepAction) => onUpdate(index, next),
-    [onUpdate, index]
-  );
-  const handleMove = useCallback(
-    (delta: -1 | 1) => onMove(index, delta),
-    [onMove, index]
-  );
-  const handleRemove = useCallback(() => onRemove(index), [onRemove, index]);
-  const handleToggle = useCallback(
-    () => onToggle(step.id),
-    [onToggle, step.id]
-  );
-  return (
-    <StepRow
-      earlierOutputs={earlierOutputs}
-      expanded={expanded}
-      maxTab={maxTab}
-      moveDownDisabled={index >= draftLength - 1}
-      moveUpDisabled={index <= 1}
-      onChange={handleChange}
-      onMove={handleMove}
-      onRemove={handleRemove}
-      onToggle={handleToggle}
-      step={step}
-    />
-  );
-}
+import { AddStepMenu } from "./add-step-menu";
+import { DraftStepRow } from "./draft-step-row";
+import { StepRow } from "./step-row";
+import type { OutputOption } from "./token-field";
 
 export function TimelineView({
   workflow,
@@ -289,20 +144,6 @@ export function TimelineView({
     onBack();
   }, [dirty, leaving, onBack]);
 
-  const renderAddTrigger = useCallback(
-    (props: {
-      "aria-expanded": boolean;
-      onClick: () => void;
-      ref: RefObject<HTMLButtonElement | null>;
-    }) => (
-      <SmallButton className="flex items-center gap-1.5" {...props}>
-        <Plus aria-hidden="true" className="size-4 shrink-0" />
-        Add step
-      </SmallButton>
-    ),
-    []
-  );
-
   return (
     <main className="flex flex-1 flex-col gap-4">
       <header className="flex items-center justify-between gap-3">
@@ -357,22 +198,7 @@ export function TimelineView({
           })}
         </Reorder.Group>
       </div>
-      <PopoverMenu
-        align="left"
-        menuClassName="min-w-44"
-        renderTrigger={renderAddTrigger}
-      >
-        {(close) =>
-          ADDABLE.map((entry) => (
-            <AddStepItem
-              close={close}
-              entry={entry}
-              key={entry.label}
-              onAdd={add}
-            />
-          ))
-        }
-      </PopoverMenu>
+      <AddStepMenu onAdd={add} />
       <div className="mt-auto flex flex-col pt-2">
         <ErrorNotice
           message={

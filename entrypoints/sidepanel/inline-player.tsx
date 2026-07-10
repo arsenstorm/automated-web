@@ -1,6 +1,5 @@
 /** Run progress inside a workflow row: bar, status text, badge. */
 
-import { cn } from "cnfast";
 import { motion } from "motion/react";
 import { Badge, type BadgeTone } from "@/components/badge";
 import { isPauseBlock, isUserClickBlock } from "@/lib/replay-state";
@@ -9,7 +8,6 @@ import { useReducedMotion } from "./motion";
 
 const RUN_TONES: Record<RunStatus, BadgeTone> = {
   done: "positive",
-  failed: "negative",
   paused: "attention",
   running: "neutral",
 };
@@ -69,10 +67,7 @@ export function InlinePlayer({
       >
         <motion.div
           animate={{ width }}
-          className={cn(
-            "h-full",
-            run.status === "failed" ? "bg-destructive" : "bg-primary"
-          )}
+          className="h-full bg-primary"
           initial={false}
           transition={transition}
         />

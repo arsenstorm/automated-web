@@ -1,20 +1,20 @@
 import { fireAndForget, onMessage } from "@/lib/messaging";
-import { stampEvents } from "@/lib/miner";
+import { stampEvents } from "@/lib/recorded-events";
 import { isUserClickBlock } from "@/lib/replay-state";
 import { getStored, setStored } from "@/lib/storage";
 import { EVENT_BUFFER_CAP } from "@/lib/types";
 import { validateSteps } from "@/lib/workflow";
 import { dismissSuggestion, runMiner, saveSuggestion } from "./mining";
 import { startRecording, stopRecording, watchRecordingTabs } from "./recording";
+import { startRun } from "./replay";
 import {
   completeUserClick,
   continueRun,
-  disarmUserClickRun,
   maybeAutoResume,
   pauseInterruptedRun,
-  startRun,
-  watchSpawnedTabs,
-} from "./replay";
+} from "./replay-resume";
+import { disarmUserClickRun } from "./replay-steps";
+import { watchSpawnedTabs } from "./replay-tabs";
 import {
   getSecure,
   lockVault,
