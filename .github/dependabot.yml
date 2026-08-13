@@ -12,6 +12,11 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      # v4 calls chrome.* directly instead of the injected browser polyfill,
+      # which breaks fake-browser-based tests. Revisit with a test migration.
+      - dependency-name: "@webext-core/messaging"
+        update-types: ["version-update:semver-major"]
     groups:
       wxt:
         patterns:
