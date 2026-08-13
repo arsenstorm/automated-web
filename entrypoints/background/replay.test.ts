@@ -7,7 +7,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fakeBrowser } from "wxt/testing";
+import { fakeBrowser } from "wxt/testing/fake-browser";
 import { sendMessage } from "@/lib/messaging";
 import { getStored, setStored } from "@/lib/storage";
 import {
@@ -171,9 +171,8 @@ describe("replay orchestration", () => {
       ([, data]) =>
         (data as { step?: { kind?: string } }).step?.kind === "input"
     );
-    expect((inputCall?.[1] as { step: { value: string } }).step.value).toBe(
-      "was $5"
-    );
+    const inputData = inputCall?.[1] as { step: { value: string } } | undefined;
+    expect(inputData?.step.value).toBe("was $5");
   });
 
   it("dispatches frameless steps explicitly to the main frame", async () => {

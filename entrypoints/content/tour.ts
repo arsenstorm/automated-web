@@ -152,7 +152,9 @@ const findPanel = (demoIndex: number): Element | null => {
   }
   return (
     document.querySelector(`[data-demo="${demo.key}"]`) ??
-    document.getElementById(demo.ids[0].slice(1))?.closest(".not-prose") ??
+    document
+      .getElementById(demo.ids[0]?.slice(1) ?? "")
+      ?.closest(".not-prose") ??
     null
   );
 };

@@ -1,7 +1,7 @@
 /** Pins the suggestion lifecycle (save/dismiss/suppress) and the locked-vault no-op. */
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { fakeBrowser } from "wxt/testing";
+import { fakeBrowser } from "wxt/testing/fake-browser";
 import { getStored } from "@/lib/storage";
 import type { CandidatePattern, RecordedEvent } from "@/lib/types";
 import { dismissSuggestion, runMiner, saveSuggestion } from "./mining";

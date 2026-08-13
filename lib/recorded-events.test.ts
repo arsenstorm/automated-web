@@ -38,9 +38,9 @@ describe("stampEvents", () => {
     });
     // The subframe's navigate event is dropped: only the top frame narrates.
     expect(stamped.map((event) => event.action.kind)).toEqual(["click"]);
-    expect(stamped[0].tabId).toBe(7);
-    expect(stamped[0].origin).toBe(ORIGIN);
-    expect(stamped[0].action.frameUrl).toBe(FRAME_URL);
+    expect(stamped[0]?.tabId).toBe(7);
+    expect(stamped[0]?.origin).toBe(ORIGIN);
+    expect(stamped[0]?.action.frameUrl).toBe(FRAME_URL);
   });
 });
 

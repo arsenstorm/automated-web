@@ -1,6 +1,6 @@
 /** Shared fixtures for the replay test suites. */
 
-import { fakeBrowser } from "wxt/testing";
+import { fakeBrowser } from "wxt/testing/fake-browser";
 import type { RunState, Workflow } from "@/lib/types";
 
 export const CLICK = { kind: "click", selector: "#go" } as const;
